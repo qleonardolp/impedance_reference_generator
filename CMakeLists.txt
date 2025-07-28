@@ -17,7 +17,10 @@ target_include_directories(kinematic_reference PUBLIC
 target_compile_features(kinematic_reference PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
 # update to target_link_libraries
-ament_target_dependencies(kinematic_reference rclcpp kinematic_pose_msgs)
+target_link_libraries(kinematic_reference PUBLIC
+  rclcpp::rclcpp
+  ${kinematic_pose_msgs_TARGETS}
+)
 
 install(
   TARGETS
