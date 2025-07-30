@@ -93,9 +93,9 @@ void KinematicReference::publisher_callback()
         ellapsed_time_ > kTimeOffset ? params_.amplitude : 0.0;
       break;
     case SignalType::kSmoothStep:
-    // Logistic function approximation
-      message_.pose.position.x =
-        params_.amplitude / (1.0 + std::exp(-200 * (ellapsed_time_ - kTimeOffset)));
+      message_.pose.position.x = logistic_function(ellapsed_time_ - kTimeOffset);
+      message_.pose_twist.linear.x = logistic_velocity(ellapsed_time_ - kTimeOffset);
+      message_.pose_accel.linear.x = logistic_acceleration(ellapsed_time_ - kTimeOffset);
       break;
     case SignalType::kSineWave:
       message_.pose.position.x =
@@ -109,6 +109,25 @@ void KinematicReference::publisher_callback()
   }
 
   publisher_->publish(message_);
+}
+
+double KinematicReference::logistic_function(const double arg)
+{
+  return params_.amplitude / (1.0 + std::exp(-kSmoothStepSlope * arg));
+}
+
+double KinematicReference::logistic_velocity(const double arg)
+{
+  return params_.amplitude * kSmoothStepSlope *
+         std::exp(kSmoothStepSlope * arg) / std::pow(1.0 + std::exp(kSmoothStepSlope * arg), 2);
+}
+
+double KinematicReference::logistic_acceleration(const double arg)
+{
+  // TODO(@me): fix equation
+  double second_derivative = logistic_velocity(arg) * kSmoothStepSlope *
+    (1.0 - 2 * logistic_function(arg));
+  return second_derivative;
 }
 
 }  // namespace kinematic_reference

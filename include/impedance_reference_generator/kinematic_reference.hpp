@@ -51,6 +51,7 @@ std::map<std::string, uint8_t> TypeMap = {
 
 const uint8_t kCartesianSpaceDim = 6;
 const double kTimeOffset = 2.0;  // seconds
+const double kSmoothStepSlope = 200.0;
 
 using KinematicPose = kinematic_pose_msgs::msg::KinematicPose;
 using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
@@ -73,6 +74,16 @@ public:
   CallbackReturn on_deactivate(const rclcpp_lifecycle::State & previous_state) override;
 
   CallbackReturn on_shutdown(const rclcpp_lifecycle::State & previous_state) override;
+
+  /**
+   * @brief Approximate a (Heaviside) step function by
+   * the Logistic function, which is differentiable
+   */
+  double logistic_function(const double arg);
+
+  double logistic_velocity(const double arg);
+
+  double logistic_acceleration(const double arg);
 
   void publisher_callback();
 
