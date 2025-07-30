@@ -1,0 +1,59 @@
+kinematic_reference:
+  topic_name: {
+    type: string,
+    default_value: "kinematic_reference",
+    description: "Reference topic name.",
+    read_only: true,
+  }
+  signal_type: {
+    type: string,
+    default_value: "step",
+    description: "Reference signal type.",
+    validation: {
+      one_of<>: [["step", "smooth-step", "sinewave", "step-up-down",]]
+    }
+  }
+  initial_pose: {
+    type: double_array,
+    default_value: [],
+    description: "Static pose (position and quaternion)
+    from which the reference signal will offset.",
+    validation: {
+      fixed_size<>: [7]
+    }
+  }
+  axis: {
+    type: string,
+    default_value: "",
+    description: "Cartesian axis of the reference signal.",
+    validation: {
+      one_of<>: [["x", "y", "z", "r", "p", "w",]]
+    }
+  }
+  duration_ms: {
+    type: int,
+    default_value: 5000,
+    description: "Signal duration time, in milliseconds.",
+  }
+  period: {
+    type: double,
+    default_value: 1.0,
+    description: "Signal period, in seconds. Valid only for sine wave and step up/down types.",
+  }
+  amplitude: {
+    type: double,
+    default_value: 0.010,
+    description: "Amplitude of the reference signal. For a step input, it is the step height.
+    For a sine wave, it is the peak deviation from zero.",
+    validation: {
+      gt<>: [0.0]
+    }
+  }
+  rate: {
+    type: int,
+    default_value: 100,
+    description: "Publisher rate in Hertz (Hz).",
+    validation: {
+      gt<>: [0.0]
+    }
+  }
