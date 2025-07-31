@@ -49,6 +49,10 @@ std::map<std::string, uint8_t> TypeMap = {
   {std::string("step-up-down"), SignalType::kStepUpDown}
 };
 
+std::map<char, std::size_t> AxisMap = {
+  {'x', 0}, {'y', 1}, {'z', 2}, {'r', 3}, {'p', 4}, {'w', 5}
+};
+
 const uint8_t kCartesianSpaceDim = 6;
 const double kTimeOffset = 2.0;  // seconds
 const double kSmoothStepSlope = 200.0;
@@ -77,14 +81,25 @@ public:
 
   /**
    * @brief Approximate a (Heaviside) step function by
-   * the Logistic function, which is differentiable
+   * the Logistic function, which is differentiable.
+   *
+   * The Logistic function is f(x) = 1 / (1 + exp(-x))
    */
   double logistic_function(const double arg);
 
+  /**
+   * @brief Logistic function first order derivative
+   */
   double logistic_velocity(const double arg);
 
+  /**
+   * @brief Logistic function second order derivative
+   */
   double logistic_acceleration(const double arg);
 
+  /**
+   * @brief Reference signal publisher callback
+   */
   void publisher_callback();
 
 private:
@@ -95,6 +110,10 @@ private:
   rclcpp::Time start_time_;
   double ellapsed_time_{0};
 
+  std::vector<double> accelerations_;
+  std::vector<double> velocities_;
+  std::vector<double> positions_;
+  std::size_t axis_;
   int signal_type_;
 
   std::shared_ptr<ParamListener> param_listener_;

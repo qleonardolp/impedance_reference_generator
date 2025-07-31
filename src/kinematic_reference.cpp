@@ -35,6 +35,10 @@ CallbackReturn KinematicReference::on_configure(
 
   publisher_ = create_publisher<KinematicPose>(params_.topic_name, qos_lowlatency);
 
+  accelerations_.resize(kCartesianSpaceDim, 0);
+  velocities_.resize(kCartesianSpaceDim, 0);
+  positions_.resize(kCartesianSpaceDim, 0);
+
   return CallbackReturn::SUCCESS;
 }
 
@@ -54,10 +58,21 @@ CallbackReturn KinematicReference::on_activate(
   params_ = param_listener_->get_params();
 
   signal_type_ = TypeMap[params_.signal_type];
+  axis_ = AxisMap[*(params_.axis.c_str())];
+
+  accelerations_.assign(kCartesianSpaceDim, 0);
+  velocities_.assign(kCartesianSpaceDim, 0);
 
   message_ = KinematicPose();
 
   uint timer_period = static_cast<uint>(1000.0 / params_.rate);
+
+  RCLCPP_INFO(get_logger(),
+    "Starting '%s' reference signal on axis %s[%lu]",
+    params_.signal_type.c_str(),
+    params_.axis.c_str(),
+    axis_
+  );
 
   start_time_ = this->get_clock()->now();
   timer_ = this->create_timer(
@@ -70,6 +85,7 @@ CallbackReturn KinematicReference::on_deactivate(
   const rclcpp_lifecycle::State &)
 {
   timer_.reset();
+  RCLCPP_INFO(get_logger(), "Reference signal stopped");
   return CallbackReturn::SUCCESS;
 }
 
@@ -87,18 +103,26 @@ void KinematicReference::publisher_callback()
   ellapsed_time_ = static_cast<double>(
     (get_clock()->now() - start_time_).nanoseconds()) * 1E-9;
 
+  // Initial pose ('DC' part of the signal)
+  positions_[0] = params_.initial_pose[0];
+  positions_[1] = params_.initial_pose[1];
+  positions_[2] = params_.initial_pose[2];
+  positions_[3] = params_.initial_pose[3];
+  positions_[4] = params_.initial_pose[4];
+  positions_[5] = params_.initial_pose[5];
+
   switch (signal_type_) {
     case SignalType::kStep:
-      message_.pose.position.x =
+      positions_[axis_] +=
         ellapsed_time_ > kTimeOffset ? params_.amplitude : 0.0;
       break;
     case SignalType::kSmoothStep:
-      message_.pose.position.x = logistic_function(ellapsed_time_ - kTimeOffset);
-      message_.pose_twist.linear.x = logistic_velocity(ellapsed_time_ - kTimeOffset);
-      message_.pose_accel.linear.x = logistic_acceleration(ellapsed_time_ - kTimeOffset);
+      positions_[axis_] += logistic_function(ellapsed_time_ - kTimeOffset);
+      velocities_[axis_] = logistic_velocity(ellapsed_time_ - kTimeOffset);
+      accelerations_[axis_] = logistic_acceleration(ellapsed_time_ - kTimeOffset);
       break;
     case SignalType::kSineWave:
-      message_.pose.position.x =
+      positions_[axis_] +=
         params_.amplitude * std::sin(2 * M_PI / params_.period * ellapsed_time_);
       break;
     case SignalType::kStepUpDown:
@@ -107,6 +131,28 @@ void KinematicReference::publisher_callback()
     default:
       break;
   }
+
+  message_.pose.position.x = positions_[0];
+  message_.pose.position.y = positions_[1];
+  message_.pose.position.z = positions_[2];
+  // TODO(@me): convert RPY to quaternions
+  message_.pose.orientation.x = positions_[3];
+  message_.pose.orientation.y = positions_[4];
+  message_.pose.orientation.z = positions_[5];
+
+  message_.pose_twist.linear.x = velocities_[0];
+  message_.pose_twist.linear.y = velocities_[1];
+  message_.pose_twist.linear.z = velocities_[2];
+  message_.pose_twist.angular.x = velocities_[3];
+  message_.pose_twist.angular.y = velocities_[4];
+  message_.pose_twist.angular.z = velocities_[5];
+
+  message_.pose_accel.linear.x = accelerations_[0];
+  message_.pose_accel.linear.y = accelerations_[1];
+  message_.pose_accel.linear.z = accelerations_[2];
+  message_.pose_accel.angular.x = accelerations_[3];
+  message_.pose_accel.angular.y = accelerations_[4];
+  message_.pose_accel.angular.z = accelerations_[5];
 
   publisher_->publish(message_);
 }
@@ -124,10 +170,16 @@ double KinematicReference::logistic_velocity(const double arg)
 
 double KinematicReference::logistic_acceleration(const double arg)
 {
-  // TODO(@me): fix equation
-  double second_derivative = logistic_velocity(arg) * kSmoothStepSlope *
-    (1.0 - 2 * logistic_function(arg));
-  return second_derivative;
+  static double exp_arg = 0.0;
+  static double coeff = 0.0;
+  static double num = 0.0;
+  static double den = 1.0;
+
+  exp_arg = std::exp(-kSmoothStepSlope * arg);
+  coeff = params_.amplitude * kSmoothStepSlope * kSmoothStepSlope;
+  num = exp_arg * (exp_arg - 1.0);
+  den = std::pow(exp_arg + 1.0, 3);
+  return coeff * (num / den);
 }
 
 }  // namespace kinematic_reference
