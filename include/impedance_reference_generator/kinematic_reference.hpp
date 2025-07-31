@@ -55,7 +55,7 @@ std::map<char, std::size_t> AxisMap = {
 
 const uint8_t kCartesianSpaceDim = 6;
 const double kTimeOffset = 2.0;  // seconds
-const double kSmoothStepSlope = 200.0;
+const double kSmoothStepSlope = 70.0;
 
 using KinematicPose = kinematic_pose_msgs::msg::KinematicPose;
 using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
