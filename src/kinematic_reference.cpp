@@ -57,6 +57,7 @@ CallbackReturn KinematicReference::on_activate(
   param_listener_->refresh_dynamic_parameters();
   params_ = param_listener_->get_params();
 
+  angular_freq_ = 2 * M_PI / params_.period;
   signal_type_ = TypeMap[params_.signal_type];
   axis_ = AxisMap[*(params_.axis.c_str())];
 
@@ -100,8 +101,12 @@ CallbackReturn KinematicReference::on_shutdown(
 
 void KinematicReference::publisher_callback()
 {
+  static double smooth_time = 0.0;
+
   ellapsed_time_ = static_cast<double>(
     (get_clock()->now() - start_time_).nanoseconds()) * 1E-9;
+
+  smooth_time = ellapsed_time_ - kTimeOffset;
 
   // Initial pose ('DC' part of the signal)
   positions_[0] = params_.initial_pose[0];
@@ -117,16 +122,26 @@ void KinematicReference::publisher_callback()
         ellapsed_time_ > kTimeOffset ? params_.amplitude : 0.0;
       break;
     case SignalType::kSmoothStep:
-      positions_[axis_] += logistic_function(ellapsed_time_ - kTimeOffset);
-      velocities_[axis_] = logistic_velocity(ellapsed_time_ - kTimeOffset);
-      accelerations_[axis_] = logistic_acceleration(ellapsed_time_ - kTimeOffset);
+      if (smooth_time < kSmoothStepEnd) {
+        positions_[axis_] += logistic_function(smooth_time);
+        velocities_[axis_] = logistic_velocity(smooth_time);
+        accelerations_[axis_] = logistic_acceleration(smooth_time);
+      } else {
+        positions_[axis_] += params_.amplitude;
+        velocities_[axis_] = 0.0;
+        accelerations_[axis_] = 0.0;
+      }
       break;
     case SignalType::kSineWave:
       positions_[axis_] +=
-        params_.amplitude * std::sin(2 * M_PI / params_.period * ellapsed_time_);
+        params_.amplitude * std::sin(angular_freq_ * ellapsed_time_);
+      velocities_[axis_] =
+        params_.amplitude * angular_freq_ * std::cos(angular_freq_ * ellapsed_time_);
+      accelerations_[axis_] =
+        -params_.amplitude * std::pow(angular_freq_, 2) * std::sin(angular_freq_ * ellapsed_time_);
       break;
     case SignalType::kStepUpDown:
-    /* code */
+      /* code */
       break;
     default:
       break;

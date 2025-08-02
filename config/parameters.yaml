@@ -1,9 +1,9 @@
 kinematic_reference:
   ros__parameters:
     topic_name: impedance_controller/reference
-    signal_type: smooth-step
-    axis: x
-    initial_pose: [0.40, -0.13, 0.45, 0.0, 0.0, 0.0, 1.0]
-    amplitude: 0.100
-    period: 2.50
-    rate: 250
+    signal_type: sinewave
+    axis: 'x'
+    initial_pose: [0.35, -0.13, 0.60, 0.0, 0.0, 0.0, 1.0]
+    amplitude: 0.10
+    period: 4.00
+    rate: 500

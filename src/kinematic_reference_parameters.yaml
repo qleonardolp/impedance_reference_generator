@@ -34,20 +34,23 @@ kinematic_reference:
     type: int,
     default_value: 5000,
     description: "Signal duration time, in milliseconds.",
+    validation: {
+      gt<>: [2000]
+    }
   }
   period: {
     type: double,
     default_value: 1.0,
     description: "Signal period, in seconds. Valid only for sine wave and step up/down types.",
+    validation: {
+      gt<>: [0.0]
+    }
   }
   amplitude: {
     type: double,
     default_value: 0.010,
     description: "Amplitude of the reference signal. For a step input, it is the step height.
     For a sine wave, it is the peak deviation from zero.",
-    validation: {
-      gt<>: [0.0]
-    }
   }
   rate: {
     type: int,
