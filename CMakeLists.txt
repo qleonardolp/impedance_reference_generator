@@ -32,6 +32,7 @@ target_link_libraries(kinematic_reference PUBLIC
   kinematic_reference_parameters
   ${kinematic_pose_msgs_TARGETS}
   ${lifecycle_msgs_TARGETS}
+  ${std_msgs_TARGETS}
 )
 
 install(

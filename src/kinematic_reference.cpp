@@ -14,6 +14,8 @@
 
 #include "impedance_reference_generator/kinematic_reference.hpp"
 
+#include <limits>
+
 namespace kinematic_reference
 {
 KinematicReference::KinematicReference(
@@ -34,6 +36,8 @@ CallbackReturn KinematicReference::on_configure(
   qos_lowlatency.liveliness(RMW_QOS_POLICY_LIVELINESS_AUTOMATIC);
 
   publisher_ = create_publisher<KinematicPose>(params_.topic_name, qos_lowlatency);
+  power_publisher_ = create_publisher<std_msgs::msg::Float64>(
+    "~/step_power", qos_lowlatency);
 
   accelerations_.resize(kCartesianSpaceDim, 0);
   velocities_.resize(kCartesianSpaceDim, 0);
@@ -47,6 +51,7 @@ CallbackReturn KinematicReference::on_cleanup(
 {
   timer_.reset();
   publisher_.reset();
+  power_publisher_.reset();
   param_listener_.reset();
   return CallbackReturn::SUCCESS;
 }
@@ -60,6 +65,23 @@ CallbackReturn KinematicReference::on_activate(
   angular_freq_ = 2 * M_PI / params_.period;
   signal_type_ = TypeMap[params_.signal_type];
   axis_ = AxisMap[*(params_.axis.c_str())];
+
+  wn_ = std::sqrt(params_.spring / params_.mass);
+  zeta_ = params_.damper / (2 * std::sqrt(params_.spring * params_.mass));
+  zeta_ = std::min(zeta_, 1.000);  // Disallow overdamped systems
+  is_critically_damped_ = (1.000 - zeta_) < std::numeric_limits<float>::epsilon();
+
+  if (is_critically_damped_) {
+    RCLCPP_WARN(get_logger(), "MSD system is critically damped.");
+    chi_ = 1.0;
+    sigma_ = wn_;
+    wd_ = wn_;
+  } else {
+    chi_ = std::sqrt(1.0 - zeta_ * zeta_);
+    beta_ = std::atan(zeta_ / chi_);
+    sigma_ = wn_ * zeta_;
+    wd_ = wn_ * chi_;
+  }
 
   accelerations_.assign(kCartesianSpaceDim, 0);
   velocities_.assign(kCartesianSpaceDim, 0);
@@ -120,6 +142,9 @@ void KinematicReference::publisher_callback()
     case SignalType::kStep:
       positions_[axis_] +=
         ellapsed_time_ > kTimeOffset ? params_.amplitude : 0.0;
+      if (ellapsed_time_ > kTimeOffset) {
+        step_power(ellapsed_time_ - kTimeOffset);
+      }
       break;
     case SignalType::kSmoothStep:
       if (smooth_time < kSmoothStepEnd) {
@@ -195,6 +220,36 @@ double KinematicReference::logistic_acceleration(const double arg)
   num = exp_arg * (exp_arg - 1.0);
   den = std::pow(exp_arg + 1.0, 3);
   return coeff * (num / den);
+}
+
+void KinematicReference::step_power(const double time)
+{
+  static double expt = 0.0;
+  static double pos = 0.0;
+  static double vel = 0.0;
+  static double acc = 0.0;
+
+  expt = std::exp(-sigma_ * time);
+
+  if (is_critically_damped_) {  // Ogata, pg. 152
+    pos = 1.0 - expt * (1 + wn_ * time);
+    vel = wn_ * wn_ * expt * time;
+    acc = wn_ * wn_ * expt * (1 - wn_ * time);
+  } else {
+    pos = 1.0 - (expt / chi_) * std::cos(wd_ * time - beta_);
+    vel = expt * (wn_ / chi_) * std::sin(wd_ * time);
+    acc = expt * (wn_ / chi_) * (std::cos(wd_ * time) - sigma_ * std::sin(wd_ * time));
+  }
+
+  // Non-unary step scaling
+  pos *= params_.amplitude;
+  vel *= params_.amplitude;
+  acc *= params_.amplitude;
+
+  power_.data = vel * (params_.mass * acc + params_.damper * vel +
+    params_.spring * (pos - params_.amplitude));
+
+  power_publisher_->publish(power_);
 }
 
 }  // namespace kinematic_reference

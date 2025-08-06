@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <kinematic_pose_msgs/msg/kinematic_pose.hpp>
+#include <std_msgs/msg/float64.hpp>
 #include <lifecycle_msgs/msg/state.hpp>
 #include <rclcpp/qos.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -80,6 +81,15 @@ public:
 
   CallbackReturn on_shutdown(const rclcpp_lifecycle::State & previous_state) override;
 
+
+  /**
+   * @brief Compute the mechanical work (power) required by
+   * a mass-spring-damper (MSD) when a step input is set for the
+   * equilibrium point, i.e. the desired position. Desired velocity
+   * and acceleration are zero.
+   */
+  void step_power(const double time);
+
   /**
    * @brief Approximate a (Heaviside) step function by
    * the Logistic function, which is differentiable.
@@ -120,6 +130,24 @@ private:
 
   std::shared_ptr<ParamListener> param_listener_;
   Params params_;
+
+  std::shared_ptr<rclcpp::Publisher<std_msgs::msg::Float64>> power_publisher_;
+  std_msgs::msg::Float64 power_;
+
+  // Flag to indicate if is critically damped
+  bool is_critically_damped_{false};
+  // Undamped natural frequency
+  double wn_;
+  // Damping factor
+  double zeta_;
+  // Damped frequency
+  double wd_;
+  // Sigma
+  double sigma_;
+  // Beta
+  double beta_;
+  // Chi
+  double chi_;
 };
 
 }  // namespace kinematic_reference

@@ -60,3 +60,30 @@ kinematic_reference:
       gt<>: [0.0]
     }
   }
+  mass: {
+    type: double,
+    default_value: 1.0,
+    description: "Mass-spring-damper lumped parameter
+    to compute the step input mechanical work, i.e. power.",
+    validation: {
+      gt<>: [0.0]
+    }
+  }
+  spring: {
+    type: double,
+    default_value: 1.0,
+    description: "Mass-spring-damper lumped parameter
+    to compute the step input mechanical work, i.e. power.",
+    validation: {
+      gt<>: [0.0]
+    }
+  }
+  damper: {
+    type: double,
+    default_value: 1.0,
+    description: "Mass-spring-damper lumped parameter
+    to compute the step input mechanical work, i.e. power.",
+    validation: {
+      gt<>: [0.0]
+    }
+  }
