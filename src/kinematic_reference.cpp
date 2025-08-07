@@ -66,22 +66,26 @@ CallbackReturn KinematicReference::on_activate(
   signal_type_ = TypeMap[params_.signal_type];
   axis_ = AxisMap[*(params_.axis.c_str())];
 
-  wn_ = std::sqrt(params_.spring / params_.mass);
-  zeta_ = params_.damper / (2 * std::sqrt(params_.spring * params_.mass));
+  mass_ = params_.mass;
+  spring_ = params_.spring;
+  damper_ = params_.damper;
+
+  wn_ = std::sqrt(spring_ / mass_);
+  zeta_ = damper_ / (2 * std::sqrt(spring_ * mass_));
   zeta_ = std::min(zeta_, 1.000);  // Disallow overdamped systems
   is_critically_damped_ = (1.000 - zeta_) < std::numeric_limits<float>::epsilon();
 
   if (is_critically_damped_) {
-    RCLCPP_WARN(get_logger(), "MSD system is critically damped.");
+    RCLCPP_WARN(get_logger(),
+      "MSD system is critically damped. \u03B6: %.4f, \u03C9: %.4f", zeta_, wn_);
     chi_ = 1.0;
-    sigma_ = wn_;
-    wd_ = wn_;
+    wd_ = 0.0;
   } else {
     chi_ = std::sqrt(1.0 - zeta_ * zeta_);
-    beta_ = std::atan(zeta_ / chi_);
-    sigma_ = wn_ * zeta_;
     wd_ = wn_ * chi_;
   }
+  beta_ = std::atan(zeta_ / chi_);
+  sigma_ = wn_ * zeta_;
 
   accelerations_.assign(kCartesianSpaceDim, 0);
   velocities_.assign(kCartesianSpaceDim, 0);
@@ -143,7 +147,7 @@ void KinematicReference::publisher_callback()
       positions_[axis_] +=
         ellapsed_time_ > kTimeOffset ? params_.amplitude : 0.0;
       if (ellapsed_time_ > kTimeOffset) {
-        step_power(ellapsed_time_ - kTimeOffset);
+        step_power(smooth_time);
       }
       break;
     case SignalType::kSmoothStep:
@@ -232,9 +236,14 @@ void KinematicReference::step_power(const double time)
   expt = std::exp(-sigma_ * time);
 
   if (is_critically_damped_) {  // Ogata, pg. 152
-    pos = 1.0 - expt * (1 + wn_ * time);
+    // Problem: these equations doesn't work well(?) with a
+    // critically damped systems (ζ = 1). Maybe for high
+    // natural frequency, i.e. high stiffness, a step will
+    // generate little to none power, since the displacement
+    // is low, thus the velocity is low too.
+    pos = 1.0 - expt * (1.0 + wn_ * time);
     vel = wn_ * wn_ * expt * time;
-    acc = wn_ * wn_ * expt * (1 - wn_ * time);
+    acc = wn_ * wn_ * expt * (1.0 - wn_ * time);
   } else {
     pos = 1.0 - (expt / chi_) * std::cos(wd_ * time - beta_);
     vel = expt * (wn_ / chi_) * std::sin(wd_ * time);
@@ -246,9 +255,7 @@ void KinematicReference::step_power(const double time)
   vel *= params_.amplitude;
   acc *= params_.amplitude;
 
-  power_.data = vel * (params_.mass * acc + params_.damper * vel +
-    params_.spring * (pos - params_.amplitude));
-
+  power_.data = vel * (mass_ * acc + damper_ * vel + spring_ * (pos - params_.amplitude));
   power_publisher_->publish(power_);
 }
 

@@ -7,6 +7,6 @@ kinematic_reference:
     amplitude: 1.0  # 0.5
     mass: 10.0
     spring: 980.0
-    damper: 197.99
+    damper: 138.60  # ζ = 0.70
     period: 4.00
     rate: 100

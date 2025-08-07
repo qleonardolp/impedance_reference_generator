@@ -134,6 +134,10 @@ private:
   std::shared_ptr<rclcpp::Publisher<std_msgs::msg::Float64>> power_publisher_;
   std_msgs::msg::Float64 power_;
 
+  double mass_;
+  double spring_;
+  double damper_;
+
   // Flag to indicate if is critically damped
   bool is_critically_damped_{false};
   // Undamped natural frequency
