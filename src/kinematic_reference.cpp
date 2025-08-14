@@ -70,6 +70,9 @@ CallbackReturn KinematicReference::on_activate(
   spring_ = params_.spring;
   damper_ = params_.damper;
 
+  power_last_ = 0.0;
+  work_ = 0.0;
+
   wn_ = std::sqrt(spring_ / mass_);
   zeta_ = damper_ / (2 * std::sqrt(spring_ * mass_));
   zeta_ = std::min(zeta_, 1.000);  // Disallow overdamped systems
@@ -231,7 +234,7 @@ void KinematicReference::step_power(const double time)
   static double expt = 0.0;
   static double pos = 0.0;
   static double vel = 0.0;
-  static double acc = 0.0;
+  static double power = 0.0;
 
   expt = std::exp(-sigma_ * time);
 
@@ -243,19 +246,21 @@ void KinematicReference::step_power(const double time)
     // is low, thus the velocity is low too.
     pos = 1.0 - expt * (1.0 + wn_ * time);
     vel = wn_ * wn_ * expt * time;
-    acc = wn_ * wn_ * expt * (1.0 - wn_ * time);
   } else {
     pos = 1.0 - (expt / chi_) * std::cos(wd_ * time - beta_);
     vel = expt * (wn_ / chi_) * std::sin(wd_ * time);
-    acc = expt * (wn_ / chi_) * (std::cos(wd_ * time) - sigma_ * std::sin(wd_ * time));
   }
 
   // Non-unary step scaling
   pos *= params_.amplitude;
   vel *= params_.amplitude;
-  acc *= params_.amplitude;
 
-  power_.data = vel * (mass_ * acc + damper_ * vel + spring_ * (pos - params_.amplitude));
+  power = vel * (spring_ * (params_.amplitude - pos) - damper_ * vel);
+  // Trapezoidal integration
+  work_ += 0.5 * (power + power_last_) / static_cast<double>(params_.rate);
+  power_last_ = power;
+
+  power_.data = work_;
   power_publisher_->publish(power_);
 }
 
