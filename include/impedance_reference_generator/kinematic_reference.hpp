@@ -137,8 +137,6 @@ private:
   double mass_;
   double spring_;
   double damper_;
-  double power_last_;
-  double work_;
 
   // Flag to indicate if is critically damped
   bool is_critically_damped_{false};

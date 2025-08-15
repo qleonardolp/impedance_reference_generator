@@ -70,9 +70,6 @@ CallbackReturn KinematicReference::on_activate(
   spring_ = params_.spring;
   damper_ = params_.damper;
 
-  power_last_ = 0.0;
-  work_ = 0.0;
-
   wn_ = std::sqrt(spring_ / mass_);
   zeta_ = damper_ / (2 * std::sqrt(spring_ * mass_));
   zeta_ = std::min(zeta_, 1.000);  // Disallow overdamped systems
@@ -234,7 +231,6 @@ void KinematicReference::step_power(const double time)
   static double expt = 0.0;
   static double pos = 0.0;
   static double vel = 0.0;
-  static double power = 0.0;
 
   expt = std::exp(-sigma_ * time);
 
@@ -255,12 +251,7 @@ void KinematicReference::step_power(const double time)
   pos *= params_.amplitude;
   vel *= params_.amplitude;
 
-  power = vel * (spring_ * (params_.amplitude - pos) - damper_ * vel);
-  // Trapezoidal integration
-  work_ += 0.5 * (power + power_last_) / static_cast<double>(params_.rate);
-  power_last_ = power;
-
-  power_.data = work_;
+  power_.data = vel * (spring_ * (params_.amplitude - pos) - damper_ * vel);
   power_publisher_->publish(power_);
 }
 
