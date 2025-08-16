@@ -41,7 +41,7 @@ CallbackReturn KinematicReference::on_configure(
 
   accelerations_.resize(kCartesianSpaceDim, 0);
   velocities_.resize(kCartesianSpaceDim, 0);
-  positions_.resize(kCartesianSpaceDim, 0);
+  positions_.resize(kPoseDim, 0);
 
   return CallbackReturn::SUCCESS;
 }
@@ -62,9 +62,10 @@ CallbackReturn KinematicReference::on_activate(
   param_listener_->refresh_dynamic_parameters();
   params_ = param_listener_->get_params();
 
-  angular_freq_ = 2 * M_PI / params_.period;
+  steps_name_ = params_.steps;
   signal_type_ = TypeMap[params_.signal_type];
   axis_ = AxisMap[*(params_.axis.c_str())];
+  angular_freq_ = 2 * M_PI / params_.period;
 
   mass_ = params_.mass;
   spring_ = params_.spring;
@@ -94,12 +95,17 @@ CallbackReturn KinematicReference::on_activate(
 
   uint timer_period = static_cast<uint>(1000.0 / params_.rate);
 
-  RCLCPP_INFO(get_logger(),
-    "Starting '%s' reference signal on axis %s[%lu]",
-    params_.signal_type.c_str(),
-    params_.axis.c_str(),
-    axis_
-  );
+  if (signal_type_ == SignalType::kStepSequence) {
+    RCLCPP_INFO(get_logger(),
+      "Starting '%s' reference signal", params_.signal_type.c_str());
+  } else {
+    RCLCPP_INFO(get_logger(),
+      "Starting '%s' reference signal on axis %s[%lu]",
+      params_.signal_type.c_str(),
+      params_.axis.c_str(),
+      axis_
+    );
+  }
 
   start_time_ = this->get_clock()->now();
   timer_ = this->create_timer(
@@ -135,12 +141,9 @@ void KinematicReference::publisher_callback()
   smooth_time = ellapsed_time_ - kTimeOffset;
 
   // Initial pose ('DC' part of the signal)
-  positions_[0] = params_.initial_pose[0];
-  positions_[1] = params_.initial_pose[1];
-  positions_[2] = params_.initial_pose[2];
-  positions_[3] = params_.initial_pose[3];
-  positions_[4] = params_.initial_pose[4];
-  positions_[5] = params_.initial_pose[5];
+  for (size_t i = 0; i < kPoseDim; i++) {
+    positions_[i] = params_.initial_pose[i];
+  }
 
   switch (signal_type_) {
     case SignalType::kStep:
@@ -172,6 +175,15 @@ void KinematicReference::publisher_callback()
     case SignalType::kStepUpDown:
       /* code */
       break;
+    case SignalType::kStepSequence:
+      for (size_t k = 0; k < steps_name_.size(); ++k) {
+        if (ellapsed_time_ > params_.steps_pose.steps_map[steps_name_[k]].time) {
+          for (size_t i = 0; i < kPoseDim; ++i) {
+            positions_[i] = params_.steps_pose.steps_map[steps_name_[k]].pose[i];
+          }
+        }
+      }
+      break;
     default:
       break;
   }
@@ -183,6 +195,7 @@ void KinematicReference::publisher_callback()
   message_.pose.orientation.x = positions_[3];
   message_.pose.orientation.y = positions_[4];
   message_.pose.orientation.z = positions_[5];
+  message_.pose.orientation.w = positions_[6];
 
   message_.pose_twist.linear.x = velocities_[0];
   message_.pose_twist.linear.y = velocities_[1];

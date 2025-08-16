@@ -10,7 +10,7 @@ kinematic_reference:
     default_value: "step",
     description: "Reference signal type.",
     validation: {
-      one_of<>: [["step", "smooth-step", "sinewave", "step-up-down",]]
+      one_of<>: [["step", "smooth-step", "sinewave", "step-up-down", "step-sequence"]]
     }
   }
   initial_pose: {
@@ -25,17 +25,9 @@ kinematic_reference:
   axis: {
     type: string,
     default_value: "",
-    description: "Cartesian axis of the reference signal.",
+    description: "Cartesian axis for single-axis reference signals. Not valid for step-sequence.",
     validation: {
       one_of<>: [["x", "y", "z", "r", "p", "w",]]
-    }
-  }
-  duration_ms: {
-    type: int,
-    default_value: 5000,
-    description: "Signal duration time, in milliseconds.",
-    validation: {
-      gt<>: [2000]
     }
   }
   period: {
@@ -87,3 +79,26 @@ kinematic_reference:
       gt<>: [0.0]
     }
   }
+  steps: {
+    type: string_array,
+    default_value: [],
+    description: "Step-sequence steps. Map the step poses with these names.",
+  }
+  steps_pose:
+    __map_steps:
+      pose: {
+        type: double_array,
+        default_value: [], 
+        description: "Step end pose.",
+        validation: {
+          fixed_size<>: [7]
+        }
+      }
+      time: {
+        type: double,
+        default_value: 1.0,
+        description: "Step time after the previous step in the sequence.",
+        validation: {
+          gt_eq<>: [0.0]
+        }
+      }
