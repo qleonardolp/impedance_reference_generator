@@ -231,7 +231,6 @@ void KinematicReference::step_power(const double time)
   static double expt = 0.0;
   static double pos = 0.0;
   static double vel = 0.0;
-  static double acc = 0.0;
 
   expt = std::exp(-sigma_ * time);
 
@@ -243,19 +242,16 @@ void KinematicReference::step_power(const double time)
     // is low, thus the velocity is low too.
     pos = 1.0 - expt * (1.0 + wn_ * time);
     vel = wn_ * wn_ * expt * time;
-    acc = wn_ * wn_ * expt * (1.0 - wn_ * time);
   } else {
     pos = 1.0 - (expt / chi_) * std::cos(wd_ * time - beta_);
     vel = expt * (wn_ / chi_) * std::sin(wd_ * time);
-    acc = expt * (wn_ / chi_) * (std::cos(wd_ * time) - sigma_ * std::sin(wd_ * time));
   }
 
   // Non-unary step scaling
   pos *= params_.amplitude;
   vel *= params_.amplitude;
-  acc *= params_.amplitude;
 
-  power_.data = vel * (mass_ * acc + damper_ * vel + spring_ * (pos - params_.amplitude));
+  power_.data = vel * (spring_ * (params_.amplitude - pos) - damper_ * vel);
   power_publisher_->publish(power_);
 }
 

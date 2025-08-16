@@ -4,9 +4,9 @@ kinematic_reference:
     signal_type: step
     axis: 'x'
     initial_pose: [0.30, -0.20, 0.30, 0.0, 0.0, 0.0, 1.0]
-    amplitude: 1.0  # 0.5
+    amplitude: 0.6  # 0.5
     mass: 10.0
-    spring: 980.0
-    damper: 138.60  # ζ = 0.70
+    spring: 800.0
+    damper: 134.164  # ζ = 0.75
     period: 4.00
-    rate: 100
+    rate: 200
