@@ -1,0 +1,57 @@
+kinematic_reference:
+  ros__parameters:
+    topic_name: leg_impedance_controller/reference
+    signal_type: step-sequence
+    initial_pose: [0.324, 0.177, -0.40, 0.0, 0.0, 0.0, 1.0]
+    amplitude: 0.4
+    axis: 'z'
+    mass: 12.585
+    spring: 800.0
+    damper: 90.0
+    rate: 100
+    steps:
+      - start
+      - jump_1
+      - settle_1
+      - jump_2
+      - settle_2
+      - jump_3
+      - settle_3
+      - jump_4
+      - settle_4
+      - jump_5
+      - settle_5
+    steps_pose:
+      start:
+        pose: [0.324, 0.177, -0.40, 0.0, 0.0, 0.0, 1.0]
+        time: 0.0
+      jump_1:
+        pose: [0.324, 0.177, -1.50, 0.0, 0.0, 0.0, 1.0]
+        time: 2.0
+      settle_1:
+        pose: [0.324, 0.177, -0.50, 0.0, 0.0, 0.0, 1.0]
+        time: 2.2
+      jump_2:
+        pose: [0.324, 0.177, -1.50, 0.0, 0.0, 0.0, 1.0]
+        time: 6.0
+      settle_2:
+        pose: [0.324, 0.177, -0.50, 0.0, 0.0, 0.0, 1.0]
+        time: 6.2
+      jump_3:
+        pose: [0.324, 0.177, -1.50, 0.0, 0.0, 0.0, 1.0]
+        time: 10.0
+      settle_3:
+        pose: [0.324, 0.177, -0.50, 0.0, 0.0, 0.0, 1.0]
+        time: 10.2
+      jump_4:
+        pose: [0.324, 0.177, -1.50, 0.0, 0.0, 0.0, 1.0]
+        time: 14.0
+      settle_4:
+        pose: [0.324, 0.177, -0.50, 0.0, 0.0, 0.0, 1.0]
+        time: 14.2
+      jump_5:
+        pose: [0.324, 0.177, -1.50, 0.0, 0.0, 0.0, 1.0]
+        time: 18.0
+      settle_5:
+        pose: [0.324, 0.177, -0.50, 0.0, 0.0, 0.0, 1.0]
+        time: 18.2

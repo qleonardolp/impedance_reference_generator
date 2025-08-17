@@ -1,0 +1,37 @@
+kinematic_reference:
+  ros__parameters:
+    topic_name: impedance_controller/reference
+    signal_type: step-sequence
+    initial_pose: [0.14931, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
+    amplitude: 0.4
+    axis: 'x'
+    mass: 10.0
+    spring: 800.0
+    damper: 134.164  # ζ = 0.75
+    rate: 100
+    steps:
+      - begin
+      - step
+      - penetration
+      - sliding
+      - rotation
+      - pushing
+    steps_pose:
+      begin:
+        pose: [0.14931, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
+        time: 0.0
+      step:
+        pose: [0.54931, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
+        time: 2.0
+      penetration: # wall is at x=0.60
+        pose: [0.650, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
+        time: 7.0
+      sliding:
+        pose: [0.650, 0.45000, 0.39000, 0.0, 0.0, 0.0, 1.0]
+        time: 10.0
+      rotation:
+        pose: [0.0, 0.4550, 0.39000, 0.0, 0.0, 0.7071068, 0.7071068]
+        time: 16.0
+      pushing:
+        pose: [0.0, 0.8550, 0.39000, 0.0, 0.0, 0.7071068, 0.7071068]
+        time: 22.0
