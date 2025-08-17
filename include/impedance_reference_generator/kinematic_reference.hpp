@@ -41,13 +41,15 @@ enum SignalType
   kSmoothStep,
   kSineWave,
   kStepUpDown,
+  kStepSequence,
 };
 
 std::map<std::string, uint8_t> TypeMap = {
   {std::string("step"), SignalType::kStep},
   {std::string("smooth-step"), SignalType::kSmoothStep},
   {std::string("sinewave"), SignalType::kSineWave},
-  {std::string("step-up-down"), SignalType::kStepUpDown}
+  {std::string("step-up-down"), SignalType::kStepUpDown},
+  {std::string("step-sequence"), SignalType::kStepSequence},
 };
 
 std::map<char, std::size_t> AxisMap = {
@@ -55,6 +57,7 @@ std::map<char, std::size_t> AxisMap = {
 };
 
 const uint8_t kCartesianSpaceDim = 6;
+const uint8_t kPoseDim = kCartesianSpaceDim + 1;  // position + quaternion
 const double kTimeOffset = 2.0;  // seconds
 const double kSmoothStepEnd = kTimeOffset + 0.22;
 const double kSmoothStepSlope = 77.0;
@@ -128,6 +131,7 @@ private:
   std::size_t axis_;
   int signal_type_;
 
+  std::vector<std::string> steps_name_;
   std::shared_ptr<ParamListener> param_listener_;
   Params params_;
 

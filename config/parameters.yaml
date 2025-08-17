@@ -3,10 +3,9 @@ kinematic_reference:
     topic_name: impedance_controller/reference
     signal_type: step
     axis: 'x'
-    initial_pose: [0.30, -0.20, 0.30, 0.0, 0.0, 0.0, 1.0]
-    amplitude: 0.6  # 0.5
+    initial_pose: [0.14931, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
+    amplitude: 0.4
     mass: 10.0
     spring: 800.0
     damper: 134.164  # ζ = 0.75
-    period: 4.00
-    rate: 200
+    rate: 100
