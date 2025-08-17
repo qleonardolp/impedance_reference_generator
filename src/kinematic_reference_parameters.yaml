@@ -10,7 +10,7 @@ kinematic_reference:
     default_value: "step",
     description: "Reference signal type.",
     validation: {
-      one_of<>: [["step", "smooth-step", "sinewave", "step-up-down", "step-sequence"]]
+      one_of<>: [["step", "smooth-step", "sinewave", "step-up-down", "step-sequence", "cpg-trajectory"]]
     }
   }
   initial_pose: {
@@ -25,7 +25,8 @@ kinematic_reference:
   axis: {
     type: string,
     default_value: "",
-    description: "Cartesian axis for single-axis reference signals. Not valid for step-sequence.",
+    description: "Cartesian axis for single-axis reference signals.
+    Not valid for step-sequence, and cpg-trajectory.",
     validation: {
       one_of<>: [["x", "y", "z", "r", "p", "w",]]
     }
@@ -102,3 +103,24 @@ kinematic_reference:
           gt_eq<>: [0.0]
         }
       }
+  cpg_length: {
+    type: double,
+    default_value: 0.3,
+    description: "Central Pattern Generator step length.",
+    validation: {
+      gt<>: [0.0]
+    }
+  }
+  cpg_robot_height: {
+    type: double,
+    default_value: 0.4,
+    description: "Robot height for Central Pattern Generator.",
+    validation: {
+      gt<>: [0.0]
+    }
+  }
+  cpg_x_offset: {
+    type: double,
+    default_value: 0.0,
+    description: "Step x offset for Central Pattern Generator.",
+  }

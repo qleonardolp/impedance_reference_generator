@@ -1,14 +1,18 @@
 kinematic_reference:
   ros__parameters:
     topic_name: leg_impedance_controller/reference
-    signal_type: step-sequence
+    signal_type: step-sequence  # step-sequence | cpg-trajectory
+    cpg_robot_height: 0.50
+    cpg_x_offset: 0.324
+    cpg_length: 0.40
+    period: 0.50
     initial_pose: [0.324, 0.177, -0.40, 0.0, 0.0, 0.0, 1.0]
     amplitude: 0.4
     axis: 'z'
     mass: 12.585
     spring: 800.0
     damper: 90.0
-    rate: 100
+    rate: 200
     steps:
       - start
       - jump_1

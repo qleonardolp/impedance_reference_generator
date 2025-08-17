@@ -42,6 +42,7 @@ enum SignalType
   kSineWave,
   kStepUpDown,
   kStepSequence,
+  kCPGLegTrajectory
 };
 
 std::map<std::string, uint8_t> TypeMap = {
@@ -50,6 +51,7 @@ std::map<std::string, uint8_t> TypeMap = {
   {std::string("sinewave"), SignalType::kSineWave},
   {std::string("step-up-down"), SignalType::kStepUpDown},
   {std::string("step-sequence"), SignalType::kStepSequence},
+  {std::string("cpg-trajectory"), SignalType::kCPGLegTrajectory},
 };
 
 std::map<char, std::size_t> AxisMap = {
@@ -94,6 +96,12 @@ public:
   void step_power(const double time);
 
   /**
+   * @brief Integrate the Central Pattern Generator amplitude equation
+   * according to https://doi.org/10.1109/IROS58592.2024.10802762
+   */
+  double cpg_amplitude();
+
+  /**
    * @brief Approximate a (Heaviside) step function by
    * the Logistic function, which is differentiable.
    *
@@ -122,8 +130,10 @@ private:
   KinematicPose message_;
 
   rclcpp::Time start_time_;
+  double publisher_period_{0};
   double ellapsed_time_{0};
   double angular_freq_{1};
+  double cpg_phase_{0};
 
   std::vector<double> accelerations_;
   std::vector<double> velocities_;

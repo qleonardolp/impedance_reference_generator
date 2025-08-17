@@ -93,9 +93,10 @@ CallbackReturn KinematicReference::on_activate(
 
   message_ = KinematicPose();
 
+  publisher_period_ = 1.0 / params_.rate;
   uint timer_period = static_cast<uint>(1000.0 / params_.rate);
 
-  if (signal_type_ == SignalType::kStepSequence) {
+  if (signal_type_ == SignalType::kStepSequence || signal_type_ == SignalType::kCPGLegTrajectory) {
     RCLCPP_INFO(get_logger(),
       "Starting '%s' reference signal", params_.signal_type.c_str());
   } else {
@@ -184,6 +185,16 @@ void KinematicReference::publisher_callback()
         }
       }
       break;
+    case SignalType::kCPGLegTrajectory:
+      cpg_phase_ = angular_freq_ * ellapsed_time_;
+      positions_[0] =
+        params_.cpg_x_offset - params_.cpg_length * cpg_amplitude() * std::cos(cpg_phase_);
+      if (std::sin(cpg_phase_) > 0.0) {
+        positions_[2] = -params_.cpg_robot_height + 0.050 * std::sin(cpg_phase_);
+      } else {
+        positions_[2] = -params_.cpg_robot_height + 0.005 * std::sin(cpg_phase_);
+      }
+      break;
     default:
       break;
   }
@@ -266,6 +277,14 @@ void KinematicReference::step_power(const double time)
 
   power_.data = vel * (spring_ * (params_.amplitude - pos) - damper_ * vel);
   power_publisher_->publish(power_);
+}
+
+double KinematicReference::cpg_amplitude()
+{
+  static double ree = 1e-6;
+
+  ree += publisher_period_ * (50.0 * (1.0 - ree * ree) * ree);
+  return ree;
 }
 
 }  // namespace kinematic_reference
