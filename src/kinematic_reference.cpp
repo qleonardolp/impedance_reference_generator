@@ -96,7 +96,7 @@ CallbackReturn KinematicReference::on_activate(
   publisher_period_ = 1.0 / params_.rate;
   uint timer_period = static_cast<uint>(1000.0 / params_.rate);
 
-  if (signal_type_ == SignalType::kStepSequence) {
+  if (signal_type_ == SignalType::kStepSequence || signal_type_ == SignalType::kCPGLegTrajectory) {
     RCLCPP_INFO(get_logger(),
       "Starting '%s' reference signal", params_.signal_type.c_str());
   } else {

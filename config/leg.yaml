@@ -1,7 +1,7 @@
 kinematic_reference:
   ros__parameters:
     topic_name: leg_impedance_controller/reference
-    signal_type: cpg-trajectory # step-sequence
+    signal_type: step-sequence  # step-sequence | cpg-trajectory
     cpg_robot_height: 0.50
     cpg_x_offset: 0.324
     cpg_length: 0.40
