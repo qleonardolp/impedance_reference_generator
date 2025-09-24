@@ -1,6 +1,6 @@
 kinematic_reference:
   ros__parameters:
-    topic_name: impedance_controller/reference
+    topic_name: ur5_controller/reference
     signal_type: step-sequence
     initial_pose: [0.14931, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
     amplitude: 0.4
@@ -16,6 +16,7 @@ kinematic_reference:
       - sliding
       - rotation
       - pushing
+      - highfive  # unstable configuration
     steps_pose:
       begin:
         pose: [0.14931, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
@@ -35,3 +36,7 @@ kinematic_reference:
       pushing:
         pose: [0.0, 0.8550, 0.39000, 0.0, 0.0, 0.7071068, 0.7071068]
         time: 22.0
+      highfive:
+        pose: [0.0, 0.0, 0.850, 0.0, 0.0, 0.7071068, 0.7071068]
+        time: 28.0
+

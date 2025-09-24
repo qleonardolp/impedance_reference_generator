@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
-project(impedance_reference_generator VERSION 1.3.0 LANGUAGES CXX)
+# TODO(@qleonardolp): rename package to `impedance_analyzer` 
+project(impedance_reference_generator VERSION 1.5.0 LANGUAGES CXX)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -7,6 +8,7 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(Eigen3 REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
@@ -43,10 +45,46 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+generate_parameter_library(
+  impedance_id_parameters
+  src/impedance_id_parameters.yaml
+)
+
+add_executable(identification src/impedance_id.cpp)
+target_include_directories(identification PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
+
+target_compile_features(identification PUBLIC c_std_99 cxx_std_17)
+
+target_link_libraries(identification PUBLIC
+  Eigen3::Eigen
+  rclcpp::rclcpp
+  rclcpp_lifecycle::rclcpp_lifecycle
+  impedance_id_parameters
+  ${kinematic_pose_msgs_TARGETS}
+  ${lifecycle_msgs_TARGETS}
+  ${std_msgs_TARGETS}
+)
+
+install(
+  DIRECTORY config launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  TARGETS
+    identification
+    impedance_id_parameters
+  EXPORT export_identification
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 endif()
 
 ament_export_targets(export_kinematic_reference HAS_LIBRARY_TARGET)
+ament_export_targets(export_identification HAS_LIBRARY_TARGET)
 ament_package()

@@ -8,14 +8,12 @@ The node parameters are handled using the `generate_parameter_library`. Set the 
 ros2 run impedance_reference_generator kinematic_reference --ros-args --params-file src/impedance_reference_generator/config/parameters.yaml
 ```
 
+After this command the lifecycle node is _inactive_ (but already configured).
 Then, transition the lifecycle to activate the publication:
 
 ```console
-ros2 lifecycle set /kinematic_reference configure
-
 ros2 lifecycle set /kinematic_reference activate
 ```
-
 
 You can change the signal by setting the parameters while the node is inactive:
 
@@ -27,4 +25,16 @@ ros2 param set /kinematic_reference amplitude 0.100
 ros2 param set /kinematic_reference rate 250
 
 ros2 lifecycle set /kinematic_reference activate
+```
+
+## Impedance Identification
+
+```console
+ros2 launch impedance_reference_generator identify.launch.py
+```
+
+Then:
+
+```console
+ros2 lifecycle set /identification activate
 ```
