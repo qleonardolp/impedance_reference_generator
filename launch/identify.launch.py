@@ -31,20 +31,20 @@ def generate_launch_description():
         )
     )
 
-    pkg_share = FindPackageShare('impedance_reference_generator')
+    pkg_share = FindPackageShare('robot_impedance_analyzer')
     param_file_path = PathJoinSubstitution(
         [pkg_share, 'config', [LaunchConfiguration('param_file'), '.yaml']]
     )
 
     reference_generator = Node(
-            package='impedance_reference_generator',
+            package='robot_impedance_analyzer',
             executable='kinematic_reference',
             name='kinematic_reference',
             parameters=[param_file_path],
         )
 
     system_identification = Node(
-            package='impedance_reference_generator',
+            package='robot_impedance_analyzer',
             executable='identification',
             name='identification',
             parameters=[param_file_path],

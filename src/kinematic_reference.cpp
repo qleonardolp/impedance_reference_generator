@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "impedance_reference_generator/kinematic_reference.hpp"
+#include "robot_impedance_analyzer/kinematic_reference.hpp"
 
 #include <limits>
 

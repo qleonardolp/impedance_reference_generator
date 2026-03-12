@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "impedance_reference_generator/impedance_id.hpp"
+#include "robot_impedance_analyzer/impedance_id.hpp"
 
 namespace impedance_identification
 {
@@ -47,48 +47,47 @@ CallbackReturn ImpedanceId::on_cleanup(
 CallbackReturn ImpedanceId::on_activate(
   const rclcpp_lifecycle::State &)
 {
-  phi_.setZero();
-  error_.setZero();
-  theta_.setZero();
-  cov_k_.setIdentity();
-  cov_k_ = 1'000 * cov_k_;
-  // Initialize theta_
-  theta_(0) = 10.0;     // 'k/m'
-  theta_(1) = 6.32455;  // 'd/m'
-  theta_(2) = 1.00;     // '1'
-
-  double beta = 2 * M_PI * 0.25;  // cutoff = 1/4 * sampling frequency
-  lpf_alpha_ = beta / (beta + 1);
-
-  acceleration_filt_.setZero();
-  last_state_.setZero();
-
-  /* ISPI */
-  zero_order_.setZero();
-  first_order_.setZero();
-  second_order_.setZero();
-  cluster_.setZero();
-  plane_normal_ << 1.0, 1.0, 1.0;
-  plane_normal_last_ << 1.0, 1.0, 1.0;
-
   param_listener_->refresh_dynamic_parameters();
   params_ = param_listener_->get_params();
 
   axis_ = ::impedance_analysis::AxisMap[*(params_.axis.c_str())];
 
-  input_subscriber_ = this->create_subscription<KinematicPose>(
-    params_.controller_reference_topic, rclcpp::QoS(1).best_effort(),
-    std::bind(&ImpedanceId::input_callback, this, std::placeholders::_1)
-  );
+  double beta = 2 * M_PI * 0.25;  // cutoff = 1/4 * fs
+  lpf_alpha_ = beta / (beta + 1);
+
+  /* RLS */
+  phi_.setZero();
+  error_.setZero();
+  theta_.setZero();
+  cov_k_.setIdentity();
+  cov_k_ *= 100.0;
+  rls_gain_den_ = 1.0;
+
+  // Initialize theta_
+  theta_(0) = params_.expected_stiffness / params_.expected_mass;  // 'k/m'
+  theta_(1) = params_.expected_damping / params_.expected_mass;  // 'd/m'
+  theta_last_ = theta_;
+  theta_fused_ = theta_;
+
+  /* ISPI */
+  zero_order_.setZero();
+  first_order_.setZero();
+  second_order_.setZero();
+  theta_svd_.setZero();
+  cluster_.setZero();
+  plane_normal_ <<
+    Eigen::Vector3d(
+      params_.expected_stiffness,
+      params_.expected_damping,
+      params_.expected_mass).normalized();
+
+  plane_normal_last_ = plane_normal_;
+
   output_subscriber_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
     params_.controller_status_topic, rclcpp::QoS(1).best_effort(),
     std::bind(&ImpedanceId::output_callback, this, std::placeholders::_1)
   );
 
-  // TODO(@me): use the SVD for long term estimation
-  // timer_ = this->create_wall_timer(
-  //   std::chrono::milliseconds(10), std::bind(&ImpedanceId::ispi_update, this)
-  // );
   RCLCPP_INFO(get_logger(), "Running 'Z' identification on axis %s.", params_.axis.c_str());
   last_clock_ = get_clock()->now();
   return CallbackReturn::SUCCESS;
@@ -97,8 +96,6 @@ CallbackReturn ImpedanceId::on_activate(
 CallbackReturn ImpedanceId::on_deactivate(
   const rclcpp_lifecycle::State &)
 {
-  // timer_.reset();
-  input_subscriber_.reset();
   output_subscriber_.reset();
   return CallbackReturn::SUCCESS;
 }
@@ -112,28 +109,23 @@ CallbackReturn ImpedanceId::on_shutdown(
   return CallbackReturn::SUCCESS;
 }
 
-void ImpedanceId::input_callback(const KinematicPose & msg)
-{
-  new_input_(0) = msg.pose.position.x;
-  new_input_(1) = msg.pose_twist.linear.x;
-  new_input_(2) = msg.pose_accel.linear.x;
-}
-
 void ImpedanceId::output_callback(const std_msgs::msg::Float64MultiArray & status_msg)
 {
   delta_t_ = 1E-9 * static_cast<double>((get_clock()->now() - last_clock_).nanoseconds());
 
   new_output_(0) = status_msg.data[kDeviationIdx + axis_];  // deviation
   new_output_(1) = status_msg.data[kTwistDeviationIdx + axis_];  // deviation derivative
+  new_output_(2) = status_msg.data[kAccelDeviationIdx + axis_];  // deviation 2nd derivative
 
-  step_detected_ = abs(status_msg.data[6 + axis_] - zero_order_(0)) > kPosDeltaThreshold;
+  step_detected_ =
+    abs(status_msg.data[kDeviationIdx + axis_] - zero_order_(0)) > kPosDeltaThreshold;
 
   if (!step_detected_) {
     for (size_t i = kTimeWindow - 1; i > 0; --i) {
       first_order_(i) = first_order_(i - 1);
       zero_order_(i) = zero_order_(i - 1);
     }
-    second_order_(0) = status_msg.data[kAccelDeviationIdx + axis_];;
+    second_order_(0) = status_msg.data[kAccelDeviationIdx + axis_];
     first_order_(0) = status_msg.data[kTwistDeviationIdx + axis_];
     zero_order_(0) = status_msg.data[kDeviationIdx + axis_];
 
@@ -154,56 +146,46 @@ void ImpedanceId::output_callback(const std_msgs::msg::Float64MultiArray & statu
     zero_order_.setZero();
   }
 
-  // rls_update();
-  // or
-  ispi_update();
+  update_ispi();  // long-term trend
+  update_rls();  // short-term trend
+  param_publisher_->publish(estimated_);
   last_clock_ = get_clock()->now();
 }
 
-// TODO: HPF on these estimates
-void ImpedanceId::rls_update()
+void ImpedanceId::update_rls()
 {
-  // rebuild the system state from x = e + x_d:
-  state_ = new_output_ + new_input_.head<kSpaceDim * kOutputDim>();
-  acceleration_ = (state_ - last_state_).tail<kSpaceDim>() / delta_t_;
-  // Roll input/state story vectors
-  last_state_ = state_;
-  acceleration_filt_ = lpf_alpha_ * acceleration_ + (1.0 - lpf_alpha_) * acceleration_filt_;
-
-  // Fill the regression vector
-  phi_.head<kSpaceDim * kOutputDim>() = -new_output_;
-  phi_(2) = new_input_(2);
+  // Update the regression vector
+  phi_ = -new_output_.head<kPhiSize>();
 
   // Update Gain
-  double den = lambda_ + phi_.transpose() * cov_k_ * phi_;
-  gain_k_.noalias() = (cov_k_ * phi_) / den;
-  // Update error
-  error_.noalias() = acceleration_filt_ - theta_.transpose() * phi_;
+  rls_gain_den_ = lambda_ + phi_.transpose() * cov_k_ * phi_;
+  gain_k_.noalias() = (cov_k_ * phi_) / rls_gain_den_;
+
+  // Update error (is blowing up...)
+  error_.noalias() = new_output_.tail<kSpaceDim>() - theta_.transpose() * phi_;
 
   // New estimation
   theta_ = theta_ + gain_k_ * error_.transpose();
   // New covariance
   cov_k_ = (CovarianceMatrix::Identity() - gain_k_ * phi_.transpose()) * cov_k_ / lambda_;
 
-  estimated_.data[0] = theta_(0);  // k/m
-  estimated_.data[1] = theta_(1);  // d/m
-  estimated_.data[2] = theta_(2);  // ~1
-  estimated_.data[3] = state_(0);
-  estimated_.data[4] = state_(1);
-  // estimated_.data[5];
-  estimated_.data[6] = acceleration_filt_(0);
+  // TODO(@qleonardolp): review this fusion formulation
+  theta_fused_ = (1.0 - lpf_alpha_) * theta_svd_ +
+    lpf_alpha_ * (theta_fused_ + theta_ - theta_last_);
+  theta_last_ = theta_;
+
+  estimated_.data[5] = theta_fused_(0);  // k/m
+  estimated_.data[6] = theta_fused_(1);  // d/m
   estimated_.data[7] = error_(0);
-  param_publisher_->publish(estimated_);
 }
 
-// TODO: LPF on these estimates. Then do the complimentary filtering for RLS + ISPI
-void ImpedanceId::ispi_update()
+void ImpedanceId::update_ispi()
 {
   // Fetch the contender point and compute the distance
   // to the last point on Cluster
-  contender_point_ << zero_order_(2), first_order_(2), second_order_(0);
+  contender_point_ << zero_order_(0), first_order_(0), second_order_(0);
   contender_distance_ = (contender_point_ - cluster_.row(0)).norm();
-  is_approved_ = contender_distance_ > kLengthLowerBound;  // pre-approved
+  is_approved_ = contender_distance_ > kLengthlb;  // pre-approved
 
   if (is_approved_) {
     // Roll Cluster points (moving window)
@@ -227,20 +209,20 @@ void ImpedanceId::ispi_update()
     if (plane_normal_.dot(plane_normal_last_) < 0) {
       plane_normal_ = -plane_normal_;
     }
-    plane_normal_last_ = plane_normal_;
 
-    theta_(0) = plane_normal_last_(0) / plane_normal_last_(2);  // k/m
-    theta_(1) = plane_normal_last_(1) / plane_normal_last_(2);  // d/m
+    // remember: n(2) = m / sqrt(k^2 + d^2 + m^2)
+    if (plane_normal_(2) > kNormalddElb) {
+      theta_svd_(0) = plane_normal_(0) / plane_normal_(2);  // k/m
+      theta_svd_(1) = plane_normal_(1) / plane_normal_(2);  // d/m
+      plane_normal_last_ = plane_normal_;
+    }
   }
 
   estimated_.data[0] = plane_normal_last_(0);
   estimated_.data[1] = plane_normal_last_(1);
   estimated_.data[2] = plane_normal_last_(2);
-  estimated_.data[3] = theta_(0);
-  estimated_.data[4] = theta_(1);
-  estimated_.data[5] = cluster_area_;
-  estimated_.data[6] = is_approved_;
-  param_publisher_->publish(estimated_);
+  estimated_.data[3] = theta_svd_(0);
+  estimated_.data[4] = theta_svd_(1);
 }
 
 }  // namespace impedance_identification

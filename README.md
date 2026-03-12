@@ -1,11 +1,11 @@
-# impedance_reference_generator
+# robot_impedance_analyzer
 
-This package provides kinematic reference generation nodes based on the [Kinematic Pose](https://github.com/qleonardolp/kinematic_pose_msgs) message, for impedance controllers pose tracking.
+This package provides robot impedance analysis tools, such as kinematic reference generation based on the [Kinematic Pose](https://github.com/qleonardolp/kinematic_pose_msgs) message, for impedance controllers dynamic pose tracking.
 
-The node parameters are handled using the `generate_parameter_library`. Set the parameters in [config/parameters.yaml](config/parameters.yaml) and run the node:
+The node parameters are handled using the `generate_parameter_library`.
 
 ```console
-ros2 run impedance_reference_generator kinematic_reference --ros-args --params-file src/impedance_reference_generator/config/parameters.yaml
+ros2 run robot_impedance_analyzer kinematic_reference --ros-args --params-file src/robot_impedance_analyzer/config/parameters.yaml
 ```
 
 After this command the lifecycle node is _inactive_ (but already configured).
@@ -30,7 +30,7 @@ ros2 lifecycle set /kinematic_reference activate
 ## Impedance Identification
 
 ```console
-ros2 launch impedance_reference_generator identify.launch.py
+ros2 launch robot_impedance_analyzer identify.launch.py
 ```
 
 Then:

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IMPEDANCE_REFERENCE_GENERATOR__COMMON_HPP_
-#define IMPEDANCE_REFERENCE_GENERATOR__COMMON_HPP_
+#ifndef ROBOT_IMPEDANCE_ANALYZER__COMMON_HPP_
+#define ROBOT_IMPEDANCE_ANALYZER__COMMON_HPP_
 
 #include <map>
 
@@ -27,4 +27,4 @@ std::map<char, std::size_t> AxisMap = {
 
 }  // namespace impedance_analysis
 
-#endif  // IMPEDANCE_REFERENCE_GENERATOR__COMMON_HPP_
+#endif  // ROBOT_IMPEDANCE_ANALYZER__COMMON_HPP_

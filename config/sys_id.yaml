@@ -1,12 +1,14 @@
 kinematic_reference:
   ros__parameters:
     topic_name: ur5_controller/reference
-    initial_pose: [0.14931, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-    signal_type: step-sequence
+    initial_pose: [0.350, -0.10915, 0.75, 0.0, 0.0, 0.0, 1.0]
+    signal_type: sinewave
+    amplitude: 0.05
+    period: 1.0
     axis: 'x'
-    mass: 20.0
-    spring: 200.0
-    damper: 126.491
+    mass: 12.0
+    spring: 400.0
+    damper: 138.564
     rate: 1000
     steps:
       - s1
@@ -27,7 +29,7 @@ kinematic_reference:
       - s16
     steps_pose:
       s1:
-        pose: [0.650, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
+        pose: [0.14931, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
         time: 2.0
       s2:
         pose: [0.640, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
@@ -77,9 +79,9 @@ kinematic_reference:
 
 identification:
   ros__parameters:
+    axis: x
     controller_reference_topic: ur5_controller/reference
     controller_status_topic: ur5_controller/status
-    axis: x
-    expected_stiffness: 200.0
+    expected_stiffness: 400.0
     expected_damping: 126.491
-    expected_mass: 20.0
+    expected_mass: 10.0

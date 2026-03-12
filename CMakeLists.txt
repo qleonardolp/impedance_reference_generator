@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-# TODO(@qleonardolp): rename package to `impedance_analyzer` 
-project(impedance_reference_generator VERSION 1.5.0 LANGUAGES CXX)
+project(robot_impedance_analyzer VERSION 2.0.0 LANGUAGES CXX)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)

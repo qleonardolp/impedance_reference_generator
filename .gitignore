@@ -1,3 +1,4 @@
+install/
 devel/
 logs/
 build/
@@ -46,6 +47,11 @@ qtcreator-*
 
 # Emacs
 .#*
+
+# ROS bags
+*/metadata.yaml
+*.mcap
+*.sqlite3
 
 # Catkin custom files
 CATKIN_IGNORE
