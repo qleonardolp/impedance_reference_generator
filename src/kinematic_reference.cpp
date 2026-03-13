@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "impedance_reference_generator/kinematic_reference.hpp"
+#include "robot_impedance_analyzer/kinematic_reference.hpp"
 
 #include <limits>
 
@@ -23,6 +23,8 @@ KinematicReference::KinematicReference(
 : rclcpp_lifecycle::LifecycleNode(node_name,
     rclcpp::NodeOptions().use_intra_process_comms(intra_process_comms))
 {
+  // could be simply `configure()`
+  trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
 }
 
 CallbackReturn KinematicReference::on_configure(
@@ -39,8 +41,8 @@ CallbackReturn KinematicReference::on_configure(
   power_publisher_ = create_publisher<std_msgs::msg::Float64>(
     "~/step_power", qos_lowlatency);
 
-  accelerations_.resize(kCartesianSpaceDim, 0);
-  velocities_.resize(kCartesianSpaceDim, 0);
+  accelerations_.resize(kSpaceDim, 0);
+  velocities_.resize(kSpaceDim, 0);
   positions_.resize(kPoseDim, 0);
 
   return CallbackReturn::SUCCESS;
@@ -64,8 +66,11 @@ CallbackReturn KinematicReference::on_activate(
 
   steps_name_ = params_.steps;
   signal_type_ = TypeMap[params_.signal_type];
-  axis_ = AxisMap[*(params_.axis.c_str())];
+  axis_ = ::impedance_analysis::AxisMap[*(params_.axis.c_str())];
   angular_freq_ = 2 * M_PI / params_.period;
+
+  phase_ = 0.0;
+  dphase_ = 1.0 / (params_.rate * params_.period);  // frequency * dt
 
   mass_ = params_.mass;
   spring_ = params_.spring;
@@ -88,8 +93,8 @@ CallbackReturn KinematicReference::on_activate(
   beta_ = std::atan(zeta_ / chi_);
   sigma_ = wn_ * zeta_;
 
-  accelerations_.assign(kCartesianSpaceDim, 0);
-  velocities_.assign(kCartesianSpaceDim, 0);
+  accelerations_.assign(kSpaceDim, 0);
+  velocities_.assign(kSpaceDim, 0);
 
   message_ = KinematicPose();
 
@@ -195,6 +200,9 @@ void KinematicReference::publisher_callback()
         positions_[2] = -params_.cpg_robot_height + 0.005 * std::sin(cpg_phase_);
       }
       break;
+    case SignalType::kSquarewave:
+      positions_[axis_] += params_.amplitude * squarewave();
+      break;
     default:
       break;
   }
@@ -285,6 +293,13 @@ double KinematicReference::cpg_amplitude()
 
   ree += publisher_period_ * (50.0 * (1.0 - ree * ree) * ree);
   return ree;
+}
+
+int8_t KinematicReference::squarewave()
+{
+  phase_ += dphase_;
+  if (phase_ >= 1.0) {phase_ -= 1.0;}  // wrap
+  return (phase_ < 0.5) ? 1 : -1;
 }
 
 }  // namespace kinematic_reference

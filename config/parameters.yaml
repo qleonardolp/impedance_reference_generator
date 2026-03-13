@@ -1,11 +1,12 @@
 kinematic_reference:
   ros__parameters:
-    topic_name: impedance_controller/reference
-    signal_type: step
+    topic_name: ur5_controller/reference
+    signal_type: sinewave
     axis: 'x'
-    initial_pose: [0.14931, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-    amplitude: 0.4
-    mass: 10.0
-    spring: 800.0
-    damper: 134.164  # ζ = 0.75
-    rate: 100
+    initial_pose: [0.39, 0.1, 0.55, 0.0, 0.0, 0.0, 1.0]
+    amplitude: 0.10
+    period: 1.0
+    mass: 20.0  # no IS: 21.0669
+    spring: 200.0  # no IS: 400.0
+    damper: 126.491
+    rate: 1000

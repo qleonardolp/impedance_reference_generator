@@ -10,7 +10,8 @@ kinematic_reference:
     default_value: "step",
     description: "Reference signal type.",
     validation: {
-      one_of<>: [["step", "smooth-step", "sinewave", "step-up-down", "step-sequence", "cpg-trajectory"]]
+      one_of<>: [["step", "smooth-step", "sinewave",
+      "step-up-down", "step-sequence", "cpg-trajectory", "squarewave"]]
     }
   }
   initial_pose: {

@@ -1,0 +1,44 @@
+impedance_identification:
+  controller_reference_topic: {
+    type: string,
+    default_value: "",
+    description: "Controller reference topic name.",
+  }
+  controller_status_topic: {
+    type: string,
+    default_value: "",
+    description: "Controller status topic name.",
+  }
+  axis: {
+    type: string,
+    default_value: "",
+    description: "Cartesian axis for single-axis reference signals.
+    Not valid for step-sequence, and cpg-trajectory.",
+    validation: {
+      one_of<>: [["x", "y", "z", "r", "p", "w",]]
+    }
+  }
+  expected_stiffness: {
+    type: double,
+    default_value: 1.0,
+    description: "Mass-spring-damper lumped parameter.",
+    validation: {
+      gt<>: [0.0]
+    }
+  }
+  expected_damping: {
+    type: double,
+    default_value: 1.0,
+    description: "Mass-spring-damper lumped parameter.",
+    validation: {
+      gt<>: [0.0]
+    }
+  }
+  expected_mass: {
+    type: double,
+    default_value: 1.0,
+    description: "Mass-spring-damper lumped parameter.",
+    validation: {
+      gt<>: [0.0]
+    }
+  }
