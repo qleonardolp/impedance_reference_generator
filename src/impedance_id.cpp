@@ -70,6 +70,7 @@ CallbackReturn ImpedanceId::on_activate(
   theta_fused_ = theta_;
 
   /* ISPI */
+  last_point_.setZero();
   zero_order_.setZero();
   first_order_.setZero();
   second_order_.setZero();
@@ -82,6 +83,8 @@ CallbackReturn ImpedanceId::on_activate(
       params_.expected_mass).normalized();
 
   plane_normal_last_ = plane_normal_;
+  three_points_ = 0;
+  downsample_ = 0;
 
   output_subscriber_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
     params_.controller_status_topic, rclcpp::QoS(1).best_effort(),
@@ -113,41 +116,45 @@ void ImpedanceId::output_callback(const std_msgs::msg::Float64MultiArray & statu
 {
   delta_t_ = 1E-9 * static_cast<double>((get_clock()->now() - last_clock_).nanoseconds());
 
-  new_output_(0) = status_msg.data[kDeviationIdx + axis_];  // deviation
+  new_output_(0) = status_msg.data[kDeviationIdx + axis_];       // deviation
   new_output_(1) = status_msg.data[kTwistDeviationIdx + axis_];  // deviation derivative
   new_output_(2) = status_msg.data[kAccelDeviationIdx + axis_];  // deviation 2nd derivative
 
+  // downsample_++;
+  // if (0 == downsample_ % 4) {
   step_detected_ =
     abs(status_msg.data[kDeviationIdx + axis_] - zero_order_(0)) > kPosDeltaThreshold;
+  estimated_.data[7] = step_detected_;
 
   if (!step_detected_) {
-    for (size_t i = kTimeWindow - 1; i > 0; --i) {
+    new_point_(0) = status_msg.data[kDeviationIdx + axis_];
+    new_point_(1) = status_msg.data[kTwistDeviationIdx + axis_];
+    new_point_(2) = status_msg.data[kAccelDeviationIdx + axis_];
+  }
+
+  if ((new_point_ - last_point_).norm() > kLengthlb) {
+    for (size_t i = kPlaneWindow - 1; i > 0; --i) {
+      second_order_(i) = second_order_(i - 1);
       first_order_(i) = first_order_(i - 1);
       zero_order_(i) = zero_order_(i - 1);
     }
-    second_order_(0) = status_msg.data[kAccelDeviationIdx + axis_];
-    first_order_(0) = status_msg.data[kTwistDeviationIdx + axis_];
-    zero_order_(0) = status_msg.data[kDeviationIdx + axis_];
-
-    // Compute `second_order_` from `first_order_` finite difference
-    /*
-    for (size_t i = 0; i < kPlaneWindow; i++) {
-      second_order_(i) = 0;  // clear
-      for (size_t k = 0; k < kFDCoeffcient.size(); k++) {
-        // !! be careful here: (i + k) must be <= (kTimeWindow -1) !!
-        second_order_(i) += kFDCoeffcient[k] * first_order_(i + k);
-      }
-      second_order_(i) /= period_;
-    }
-    */
-  } else {
-    second_order_.setZero();
-    first_order_.setZero();
-    zero_order_.setZero();
+    second_order_(0) = new_point_(2);
+    first_order_(0) = new_point_(1);
+    zero_order_(0) = new_point_(0);
+    three_points_++;
   }
 
-  update_ispi();  // long-term trend
-  update_rls();  // short-term trend
+  if (0 == three_points_ % 3) {
+    // Compute only once three new points are fetched.
+    // This is to decouple the effect of d (`f_int`) between
+    // planes with different d.
+    update_ispi();
+    three_points_ = 0;
+  }
+  // downsample_ = 0;
+  // }
+
+  // update_rls();
   param_publisher_->publish(estimated_);
   last_clock_ = get_clock()->now();
 }
@@ -181,48 +188,26 @@ void ImpedanceId::update_rls()
 
 void ImpedanceId::update_ispi()
 {
-  // Fetch the contender point and compute the distance
-  // to the last point on Cluster
-  contender_point_ << zero_order_(0), first_order_(0), second_order_(0);
-  contender_distance_ = (contender_point_ - cluster_.row(0)).norm();
-  is_approved_ = contender_distance_ > kLengthlb;  // pre-approved
+  // (y_1 - y_3) * z_2
+  ispi_est_(0) = (first_order_(0) - first_order_(2)) * second_order_(1);
+  // z_1 * x_3 - z_3 * x_1
+  ispi_est_(1) = second_order_(0) * zero_order_(2) - second_order_(2) * zero_order_(0);
+  // (y_3 - y_1) * x_2
+  ispi_est_(2) = (first_order_(2) - first_order_(0)) * zero_order_(1);
+  // x_3 * y_2 * z_1 - z_3 * y_2 * x_1
+  ispi_est_(3) =
+    zero_order_(2) * first_order_(1) * second_order_(0) -
+    second_order_(2) * first_order_(1) * zero_order_(0);
 
-  if (is_approved_) {
-    // Roll Cluster points (moving window)
-    for (size_t k = kPlaneWindow - 1; k > 0; --k) {
-      cluster_.row(k) = cluster_.row(k - 1);
-    }
-    cluster_.row(0) = contender_point_;
+  v1_ << zero_order_(1) - zero_order_(0), first_order_(1) - first_order_(0), second_order_(1) - second_order_(0);
+  v2_ << zero_order_(2) - zero_order_(0), first_order_(2) - first_order_(0), second_order_(2) - second_order_(0);
 
-    // Centralize points
-    cluster_centroid_ = cluster_.colwise().mean();
-    cluster_centered_ = cluster_.rowwise() - cluster_centroid_;
-
-    // Compute the SVD
-    cluster_svd_.compute(cluster_centered_, Eigen::ComputeFullV);
-    cluster_area_ =
-      cluster_svd_.singularValues()(0) * cluster_svd_.singularValues()(1);
-    least_sv_ = cluster_svd_.singularValues()(2);
-
-    plane_normal_ = cluster_svd_.matrixV().rightCols<1>();
-    // Fix sign flipping
-    if (plane_normal_.dot(plane_normal_last_) < 0) {
-      plane_normal_ = -plane_normal_;
-    }
-
-    // remember: n(2) = m / sqrt(k^2 + d^2 + m^2)
-    if (plane_normal_(2) > kNormalddElb) {
-      theta_svd_(0) = plane_normal_(0) / plane_normal_(2);  // k/m
-      theta_svd_(1) = plane_normal_(1) / plane_normal_(2);  // d/m
-      plane_normal_last_ = plane_normal_;
-    }
-  }
-
-  estimated_.data[0] = plane_normal_last_(0);
-  estimated_.data[1] = plane_normal_last_(1);
-  estimated_.data[2] = plane_normal_last_(2);
-  estimated_.data[3] = theta_svd_(0);
-  estimated_.data[4] = theta_svd_(1);
+  estimated_.data[0] = ispi_est_(0);
+  estimated_.data[1] = ispi_est_(1);
+  estimated_.data[2] = ispi_est_(2);
+  estimated_.data[3] = ispi_est_(3);
+  estimated_.data[4] = v1_.norm();
+  estimated_.data[5] = v2_.norm();
 }
 
 }  // namespace impedance_identification

@@ -55,13 +55,12 @@ const size_t kPhiSize = kSpaceDim * (2);
 
 typedef Eigen::Matrix<double, kPhiSize, kPhiSize> CovarianceMatrix;
 
-const uint8_t kPlaneWindow = 96;
-const uint8_t kTimeWindow = kPlaneWindow + 4;
+const uint8_t kPlaneWindow = 3;
 // First order finite difference with five points (2, 1, 0, -1, -2)
 const std::array<double, 5> kFDCoeffcient = {-1.0 / 12, 8.0 / 12, 0, -8.0 / 12, 1.0 / 12};
 
 const double kPosDeltaThreshold = 0.030;  // ~100 km/h @ 1000 Hz
-const double kLengthlb = 0.0005;  // point distance lower bound in the impedance space
+const double kLengthlb = 0.5;  // point distance lower bound in the impedance space
 const double kNormalddElb = 0.00098;  // plane normal last element (\ddot{e}) lower bound
 typedef Eigen::Matrix<double, kPlaneWindow, 3> ClusterMatrix;
 
@@ -70,8 +69,8 @@ using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface
 
 /**
  * @brief Lifecycle Node with a subscriber (std_msgs::msg::Float64MultiArray) to identify
- * the impedance parameters (stiffness and damping) from the deviation (e),
- * deviation derivative (dot{e}), and interaction wrench estimation (f_{int}).
+ * the impedance parameters (stiffness, damping, and inertia) from e, $\ \dot{e} \$, and
+ * $\ \ddot{e} \$ or interaction wrench (f_{int}).
  */
 class ImpedanceId : public rclcpp_lifecycle::LifecycleNode
 {
@@ -149,8 +148,8 @@ private:
 
   /* Impedance space planar identification (ISPI) class members */
   Eigen::JacobiSVD<ClusterMatrix> cluster_svd_;
-  Eigen::Vector<double, kTimeWindow> zero_order_;            // deviation
-  Eigen::Vector<double, kTimeWindow> first_order_;           // deviation 1st derivative
+  Eigen::Vector<double, kPlaneWindow> zero_order_;            // deviation
+  Eigen::Vector<double, kPlaneWindow> first_order_;           // deviation 1st derivative
   Eigen::Vector<double, kPlaneWindow> second_order_;         // deviation 2nd derivative
   Eigen::Matrix<double, kPlaneWindow, 3> cluster_;           // Cluster of points
   Eigen::Matrix<double, kPlaneWindow, 3> cluster_centered_;  // Cluster of points to be SVD'ed
@@ -164,6 +163,13 @@ private:
   double least_sv_;                                          // Least singular value
   bool step_detected_;
   bool is_approved_;
+  Eigen::Vector4d ispi_est_;  // k, d, m, f_int
+  Eigen::Vector3d new_point_;
+  Eigen::Vector3d last_point_;
+  Eigen::Vector3d v1_;
+  Eigen::Vector3d v2_;
+  uint8_t three_points_;      // plane three points counter
+  uint8_t downsample_;
   /* End of ISPI class members */
 };
 
