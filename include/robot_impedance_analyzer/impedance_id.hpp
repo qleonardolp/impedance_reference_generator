@@ -39,19 +39,18 @@
 namespace impedance_identification
 {
 // Status msg deviation zero index
-const size_t kDeviationIdx = 6;
+const size_t kDevId = 6;
 // Status msg twist deviation zero index
-const size_t kTwistDeviationIdx = 12;
+const size_t kVelId = 12;
 // Status msg accel deviation zero index
-const size_t kAccelDeviationIdx = 18;
+const size_t kAccId = 18;
 // Output vector y is [e, \dot{e}, \ddot{e}]^T
 const uint8_t kOutputDim = 3;
-// TODO(@me): consider use this node for single-axis identification, and
-// start a dedicated node for each axis (use a param to define the selected axis)
-const uint8_t kSpaceDim = 1;
-const uint8_t kPoseDim = 7;  // position + quaternion
-// Regression vector \phi is [e(k-1), \dot{e}(k-1)]^T
-const size_t kPhiSize = kSpaceDim * (2);
+
+const uint8_t kSpaceDim = 1;  // TODO(@me): refact for multi-axis identification
+const uint8_t kPoseDim = 7;   // position + quaternion
+// Regression vector \phi is [e(k-1), \dot{e}(k-1), 1]^T
+const size_t kPhiSize = kSpaceDim * (3);
 
 typedef Eigen::Matrix<double, kPhiSize, kPhiSize> CovarianceMatrix;
 
@@ -60,8 +59,7 @@ const uint8_t kPlaneWindow = 3;
 const std::array<double, 5> kFDCoeffcient = {-1.0 / 12, 8.0 / 12, 0, -8.0 / 12, 1.0 / 12};
 
 const double kPosDeltaThreshold = 0.030;  // ~100 km/h @ 1000 Hz
-const double kLengthlb = 0.5;  // point distance lower bound in the impedance space
-const double kNormalddElb = 0.00098;  // plane normal last element (\ddot{e}) lower bound
+const double kAreaThreshold = 4e-7;  // Cluster (3 points) minimum area
 typedef Eigen::Matrix<double, kPlaneWindow, 3> ClusterMatrix;
 
 using KinematicPose = kinematic_pose_msgs::msg::KinematicPose;
@@ -109,25 +107,22 @@ private:
   rclcpp::Time last_clock_;
   double delta_t_;  // time delta
 
-  rclcpp::TimerBase::SharedPtr timer_;
-  double period_{0.0010};  // timer period (1 millisecond)
-
   std::shared_ptr<ParamListener> param_listener_;
   Params params_;
 
   std::size_t axis_;
+  bool step_detected_;
 
   // System output (y) subscriber.
   rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr output_subscriber_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr param_publisher_;
-  std_msgs::msg::Float64MultiArray estimated_;
+  std_msgs::msg::Float64MultiArray estimates_;
 
   // Theta estimation from RLS and ISPI fusion
-  Eigen::Vector2d theta_fused_;
+  Eigen::Vector3d fused_theta_;
 
   /* Recursive Least Squares (RLS) class members */
-  // RLS Forgetting factor
-  double lambda_{0.999};  // > 0.99
+  double lambda_{1.0 - 2e-6};  // RLS forgetting factor
   // Estimated parameters
   Eigen::Matrix<double, kPhiSize, kSpaceDim> theta_;
   // Estimated parameters (last)
@@ -142,34 +137,22 @@ private:
 
   Eigen::Vector<double, kSpaceDim * kOutputDim> new_output_;  // e, de, dde
   // Without interaction (f_{int} = 0):
-  // error = dde + k/m * e + d/m * de
+  // error = dde + k/m * e + d/m * de - b
+  // b = 1/m * f_int
   Eigen::Vector<double, kSpaceDim> error_;
   /* End of RLS class members */
 
   /* Impedance space planar identification (ISPI) class members */
-  Eigen::JacobiSVD<ClusterMatrix> cluster_svd_;
-  Eigen::Vector<double, kPlaneWindow> zero_order_;            // deviation
-  Eigen::Vector<double, kPlaneWindow> first_order_;           // deviation 1st derivative
-  Eigen::Vector<double, kPlaneWindow> second_order_;         // deviation 2nd derivative
-  Eigen::Matrix<double, kPlaneWindow, 3> cluster_;           // Cluster of points
-  Eigen::Matrix<double, kPlaneWindow, 3> cluster_centered_;  // Cluster of points to be SVD'ed
-  Eigen::RowVector3d cluster_centroid_;                      // Cluster points centroid
-  Eigen::Vector3d plane_normal_;                             // estimated plane normal vector
-  Eigen::Vector3d plane_normal_last_;
-  Eigen::RowVector3d contender_point_;
-  Eigen::Vector2d theta_svd_;
-  double contender_distance_;
-  double cluster_area_;
-  double least_sv_;                                          // Least singular value
-  bool step_detected_;
-  bool is_approved_;
-  Eigen::Vector4d ispi_est_;  // k, d, m, f_int
-  Eigen::Vector3d new_point_;
-  Eigen::Vector3d last_point_;
-  Eigen::Vector3d v1_;
-  Eigen::Vector3d v2_;
-  uint8_t three_points_;      // plane three points counter
-  uint8_t downsample_;
+  Eigen::Vector3d new_point_;     //
+  Eigen::Vector3d first_point_;   //
+  Eigen::Vector3d cross_prod_;    //
+  Eigen::Vector3d direction_v1_;  // plane direction vector 1
+  Eigen::Vector3d direction_v2_;  // plane direction vector 2
+  Eigen::Vector3d plane_n_;       // estimated plane normal vector
+  Eigen::Vector3d plane_n_last_;  // estimated plane normal vector (last)
+  Eigen::Vector3d plane_n_filt_;  // estimated plane normal vector (filtered)
+  uint8_t point_counter_;         // plane points counter (<= 3)
+  double cluster_area_;           // area spanned by the three points
   /* End of ISPI class members */
 };
 
