@@ -42,3 +42,19 @@ impedance_identification:
       gt<>: [0.0]
     }
   }
+  sampling_frequency: {
+    type: double,
+    default_value: 1000.0,
+    description: "Controller status sampling frequency",
+    validation: {
+      gt<>: [0.0]
+    }
+  }
+  cutoff_frequency: {
+    type: double,
+    default_value: 20.0,
+    description: "Low-pass filter cutoff frequency",
+    validation: {
+      gt<>: [0.0]
+    }
+  }

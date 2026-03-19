@@ -82,6 +82,8 @@ identification:
     axis: x
     controller_reference_topic: ur5_controller/reference
     controller_status_topic: ur5_controller/status
+    sampling_frequency: 1000.0
+    cutoff_frequency: 7.0
     expected_stiffness: 400.0
     expected_damping: 126.491
     expected_mass: 10.0

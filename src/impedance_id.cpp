@@ -52,7 +52,7 @@ CallbackReturn ImpedanceId::on_activate(
 
   axis_ = ::impedance_analysis::AxisMap[*(params_.axis.c_str())];
 
-  double beta = 2 * M_PI * 0.05;  // cutoff = 1/20 * fs
+  double beta = 2 * M_PI * params_.cutoff_frequency / params_.sampling_frequency;
   lpf_alpha_ = beta / (beta + 1);
 
   /* RLS */
@@ -188,16 +188,28 @@ void ImpedanceId::update_ispi()
       plane_n_ = -plane_n_;
     }
     plane_n_last_ = plane_n_;
+
+    // sample and hold first_point_
+    first_last_ = first_point_;
+
     point_counter_ = 0;
   }
 
+  // n1 * x + n2 * y + n3 * z + d/|n| = 0
+  // plane_d_ = - plane_n_last_.dot(first_last_);
+
   plane_n_filt_ = lpf_alpha_ * plane_n_last_ + (1.0 - lpf_alpha_) * plane_n_filt_;
+
+  // The acceleration offset represent how much `dde` should change
+  // in the first_last_ point so this new point belong to a parallel
+  // plane with `d` = 0, i.e., f_int = 0.
+  dde_offset_ = plane_n_filt_.dot(first_last_) / plane_n_filt_(2);
 
   estimates_.data[0] = abs(plane_n_filt_(0));
   estimates_.data[1] = abs(plane_n_filt_(1));
   estimates_.data[2] = abs(plane_n_filt_(2));
   estimates_.data[3] = cluster_area_;
-  estimates_.data[4] = point_counter_;
+  estimates_.data[4] = dde_offset_;
 }
 
 }  // namespace impedance_identification

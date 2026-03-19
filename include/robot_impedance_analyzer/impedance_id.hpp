@@ -145,6 +145,7 @@ private:
   /* Impedance space planar identification (ISPI) class members */
   Eigen::Vector3d new_point_;     //
   Eigen::Vector3d first_point_;   //
+  Eigen::Vector3d first_last_;    //
   Eigen::Vector3d cross_prod_;    //
   Eigen::Vector3d direction_v1_;  // plane direction vector 1
   Eigen::Vector3d direction_v2_;  // plane direction vector 2
@@ -153,6 +154,8 @@ private:
   Eigen::Vector3d plane_n_filt_;  // estimated plane normal vector (filtered)
   uint8_t point_counter_;         // plane points counter (<= 3)
   double cluster_area_;           // area spanned by the three points
+  double dde_offset_;             // acceleration offset due to residual f_int
+  double plane_d_;                // plane `d` (a*x + b*y + c*z + d = 0)
   /* End of ISPI class members */
 };
 
