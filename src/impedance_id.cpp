@@ -58,16 +58,16 @@ CallbackReturn ImpedanceId::on_activate(
   /* RLS */
   phi_.setOnes();
   error_.setZero();
-  theta_.setOnes();
+  theta_.setZero();
   cov_k_.setIdentity();
   cov_k_ *= 10'000;
   rls_gain_den_ = 1.0;
 
-  // Initialize theta_
-  theta_(0) = params_.expected_stiffness / params_.expected_mass;  // 'k/m'
-  theta_(1) = params_.expected_damping / params_.expected_mass;  // 'd/m'
+  theta_(0) = 1.0;
   theta_last_ = theta_;
-  fused_theta_ = theta_;
+
+  k_m_ratio_ = params_.expected_stiffness / params_.expected_mass;
+  d_m_ratio_ = params_.expected_damping / params_.expected_mass;
 
   /* ISPI */
   point_counter_ = 0;
@@ -132,12 +132,10 @@ void ImpedanceId::output_callback(const std_msgs::msg::Float64MultiArray & statu
 
 void ImpedanceId::update_rls()
 {
-  // TODO(@me): correlate phi(k) with phi(k-1) and derive the error
-  // from it, using the state space description
-
   // Update the regression vector
-  phi_.head<2>() = -new_output_.head<2>();
-  phi_(2) = 1.0;
+  phi_(0) = k_m_ratio_ * new_output_(0) + d_m_ratio_ * new_output_(1);
+  phi_(0) = - phi_(0);
+  phi_(1) = 1.0 / params_.expected_mass;
 
   // Update Gain
   rls_gain_den_ = lambda_ + phi_.transpose() * cov_k_ * phi_;
@@ -151,9 +149,9 @@ void ImpedanceId::update_rls()
   // New covariance
   cov_k_ = (CovarianceMatrix::Identity() - gain_k_ * phi_.transpose()) * cov_k_ / lambda_;
 
-  estimates_.data[5] = theta_(0);  // k/m
-  estimates_.data[6] = theta_(1);  // d/m
-  estimates_.data[7] = theta_(2);  // b
+  estimates_.data[5] = theta_(0);  // s
+  estimates_.data[6] = theta_(1);  // l
+  estimates_.data[7] = error_(0);  // regression error
 }
 
 void ImpedanceId::update_ispi()

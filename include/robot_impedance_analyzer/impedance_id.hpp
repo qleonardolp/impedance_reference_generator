@@ -49,8 +49,8 @@ const uint8_t kOutputDim = 3;
 
 const uint8_t kSpaceDim = 1;  // TODO(@me): refact for multi-axis identification
 const uint8_t kPoseDim = 7;   // position + quaternion
-// Regression vector \phi is [e(k-1), \dot{e}(k-1), 1]^T
-const size_t kPhiSize = kSpaceDim * (3);
+// Regression vector \phi is [ -(k/m * e + d/m * \dot{e}), 1/m ]^T
+const size_t kPhiSize = kSpaceDim * 2;
 
 typedef Eigen::Matrix<double, kPhiSize, kPhiSize> CovarianceMatrix;
 
@@ -122,7 +122,7 @@ private:
   Eigen::Vector3d fused_theta_;
 
   /* Recursive Least Squares (RLS) class members */
-  double lambda_{1.0 - 2e-6};  // RLS forgetting factor
+  double lambda_{0.9524};  // RLS forgetting factor, N ~ 1/(1 - lambda_)
   // Estimated parameters
   Eigen::Matrix<double, kPhiSize, kSpaceDim> theta_;
   // Estimated parameters (last)
@@ -134,11 +134,15 @@ private:
   // Gain (K_k)
   Eigen::Vector<double, kPhiSize> gain_k_;
   double rls_gain_den_{1.0};
+  // Designed k/m
+  double k_m_ratio_;
+  // Designed d/m
+  double d_m_ratio_;
 
   Eigen::Vector<double, kSpaceDim * kOutputDim> new_output_;  // e, de, dde
-  // Without interaction (f_{int} = 0):
-  // error = dde + k/m * e + d/m * de - b
-  // b = 1/m * f_int
+  // From the 1-DoF equivalence (CBA2026), we have:
+  // dde = s * (-k/m *e - d/m *\dot{e}) + l *(1/m)
+  // Then, error = dde - s * (-k/m *e - d/m *\dot{e}) - l *(1/m) ~ 0
   Eigen::Vector<double, kSpaceDim> error_;
   /* End of RLS class members */
 
