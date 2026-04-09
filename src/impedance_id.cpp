@@ -59,13 +59,10 @@ CallbackReturn ImpedanceId::on_activate(
   phi_.setOnes();
   error_.setZero();
   theta_.setZero();
-  cov_k_.setIdentity();
-  cov_k_ *= 10'000;
-  rls_gain_den_ = 1.0;
-
   theta_(0) = 1.0;
   theta_last_ = theta_;
-
+  rls_gain_den_ = 1.0;
+  cov_k_ = 1'000 * CovarianceMatrix::Identity();
   k_m_ratio_ = params_.expected_stiffness / params_.expected_mass;
   d_m_ratio_ = params_.expected_damping / params_.expected_mass;
 
@@ -124,8 +121,14 @@ void ImpedanceId::output_callback(const std_msgs::msg::Float64MultiArray & statu
     new_point_(2) = status_msg.data[kAccId + axis_];
   }
 
-  update_ispi();
-  update_rls();
+  if (!new_output_.hasNaN()) {
+    update_rls();
+  }
+
+  if (!new_point_.hasNaN()) {
+    update_ispi();
+  }
+
   param_publisher_->publish(estimates_);
   last_clock_ = get_clock()->now();
 }
@@ -133,8 +136,7 @@ void ImpedanceId::output_callback(const std_msgs::msg::Float64MultiArray & statu
 void ImpedanceId::update_rls()
 {
   // Update the regression vector
-  phi_(0) = k_m_ratio_ * new_output_(0) + d_m_ratio_ * new_output_(1);
-  phi_(0) = - phi_(0);
+  phi_(0) = (k_m_ratio_ * new_output_(0) + d_m_ratio_ * new_output_(1)) * (-1);
   phi_(1) = 1.0 / params_.expected_mass;
 
   // Update Gain

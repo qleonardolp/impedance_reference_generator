@@ -122,7 +122,7 @@ private:
   Eigen::Vector3d fused_theta_;
 
   /* Recursive Least Squares (RLS) class members */
-  double lambda_{0.9524};  // RLS forgetting factor, N ~ 1/(1 - lambda_)
+  double lambda_{0.889};  // RLS forgetting factor, N ~ 1/(1 - lambda_)
   // Estimated parameters
   Eigen::Matrix<double, kPhiSize, kSpaceDim> theta_;
   // Estimated parameters (last)
