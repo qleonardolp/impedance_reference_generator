@@ -1,9 +1,11 @@
 kinematic_reference:
   ros__parameters:
-    topic_name: ur5_controller/reference
-    initial_pose: [0.350, -0.10915, 0.75, 0.0, 0.0, 0.0, 1.0]
-    signal_type: sines
-    axis: 'x'
+    topic_name: hyl_controller/reference
+    initial_pose: [0.0, 0.13, -0.4534, 0.0, -0.4792, 0.0, 0.8776]
+    signal_type: PRBS
+    amplitude: 0.050
+    period: 1.7
+    axis: z
     sines_amp: [0.010, 0.020, 0.005, 0.0254, 0.050, 0.018, 0.005]
     sines_freq: [0.007, 0.010, 0.066, 1.000, 7.000, 11.50, 14.00]
     rate: 1000
@@ -13,9 +15,9 @@ kinematic_reference:
 
 identification:
   ros__parameters:
-    axis: x
-    controller_reference_topic: ur5_controller/reference
-    controller_status_topic: ur5_controller/status
+    axis: z
+    controller_reference_topic: hyl_controller/reference
+    controller_status_topic: hyl_controller/status
     sampling_frequency: 1000.0
     cutoff_frequency: 20.0
     expected_stiffness: 490.0

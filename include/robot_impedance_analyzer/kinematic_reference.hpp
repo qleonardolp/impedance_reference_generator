@@ -19,6 +19,7 @@
 #include <chrono>
 #include <map>
 #include <memory>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -125,6 +126,11 @@ public:
   double logistic_acceleration(const double arg);
 
   /**
+   * @brief Pseudo Random Binary Signal (PRBS)
+   */
+  void setPRBS_filtered();
+
+  /**
    * @brief Sum of sines signal
    */
   void sinewaves();
@@ -154,7 +160,6 @@ private:
   std::vector<double> accelerations_;
   std::vector<double> velocities_;
   std::vector<double> positions_;
-  std::vector<double> dc_term_;  // position DC term (constant)
   std::size_t axis_;
   int signal_type_;
 
@@ -164,6 +169,15 @@ private:
 
   std::shared_ptr<rclcpp::Publisher<std_msgs::msg::Float64>> power_publisher_;
   std_msgs::msg::Float64 power_;
+
+  // PRBS random number generator (32 bits)
+  std::minstd_rand pseudo_rand;
+  // PRBS raw signal
+  double prbs_signal_;
+  // PRBS bit 'period'
+  uint prbs_Tb_;
+  // PRBS time(k) counter
+  uint prbs_counter_;
 
   double mass_;
   double spring_;

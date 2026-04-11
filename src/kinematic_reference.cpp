@@ -44,7 +44,6 @@ CallbackReturn KinematicReference::on_configure(
   accelerations_.resize(kSpaceDim, 0);
   velocities_.resize(kSpaceDim, 0);
   positions_.resize(kPoseDim, 0);
-  dc_term_.resize(kPoseDim, 0);
 
   return CallbackReturn::SUCCESS;
 }
@@ -70,8 +69,11 @@ CallbackReturn KinematicReference::on_activate(
   axis_ = ::impedance_analysis::AxisMap[*(params_.axis.c_str())];
   angular_freq_ = PI_2 / params_.period;
 
-  phase_ = 0.0;
+  prbs_Tb_ = 835;  // 0.835 s
+  prbs_counter_ = 0;
+
   dphase_ = 1.0 / (params_.rate * params_.period);  // frequency * dt
+  phase_ = 0.0;
 
   mass_ = params_.mass;
   spring_ = params_.spring;
@@ -150,7 +152,6 @@ void KinematicReference::publisher_callback()
   // Initial pose ('DC' part of the signal)
   for (size_t i = 0; i < kPoseDim; i++) {
     positions_[i] = params_.initial_pose[i];
-    dc_term_[i] = params_.initial_pose[i];
   }
 
   switch (signal_type_) {
@@ -207,6 +208,9 @@ void KinematicReference::publisher_callback()
       break;
     case SignalType::kSines:
       sinewaves();
+      break;
+    case SignalType::kPRBS:
+      setPRBS_filtered();
       break;
     default:
       break;
@@ -307,11 +311,22 @@ int8_t KinematicReference::squarewave()
   return (phase_ < 0.5) ? 1 : -1;
 }
 
+void KinematicReference::setPRBS_filtered()
+{
+  if (prbs_counter_ >= prbs_Tb_) {
+    prbs_signal_ =
+      params_.amplitude * static_cast<double>(pseudo_rand()) / pseudo_rand.max();
+    prbs_counter_ = 0;
+  }
+  prbs_counter_++;
+
+  positions_[axis_] += prbs_signal_;
+}
+
 void KinematicReference::sinewaves()
 {
   static double ang_freq = 0.0;
 
-  positions_[axis_] = dc_term_[axis_];
   for (size_t i = 0; i < params_.sines_amp.size(); i++) {
     ang_freq = PI_2 * params_.sines_freq[i];
     positions_[axis_] += params_.sines_amp[i] * std::sin(ang_freq * ellapsed_time_);
