@@ -146,6 +146,11 @@ public:
    */
   void publisher_callback();
 
+  /**
+   * @brief Second order low pass filter
+   */
+  double lpf_biquad(const double sample);
+
 private:
   std::shared_ptr<rclcpp::TimerBase> timer_;
   std::shared_ptr<rclcpp::Publisher<KinematicPose>> publisher_;
@@ -174,10 +179,16 @@ private:
   std::minstd_rand pseudo_rand;
   // PRBS raw signal
   double prbs_signal_;
-  // PRBS bit 'period'
-  uint prbs_Tb_;
-  // PRBS time(k) counter
+  // System settling time (in k) for PRBS
+  uint prbs_settling_time_;
+  // PRBS time (in k) counter
   uint prbs_counter_;
+
+  // LPF Biquad
+  double y_k_;
+  double u_k0_, u_k1_, u_k2_;
+  double b0_, b1_, b2_;
+  double a1_, a2_;
 
   double mass_;
   double spring_;

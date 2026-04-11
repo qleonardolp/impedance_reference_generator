@@ -69,18 +69,31 @@ CallbackReturn KinematicReference::on_activate(
   axis_ = ::impedance_analysis::AxisMap[*(params_.axis.c_str())];
   angular_freq_ = PI_2 / params_.period;
 
-  prbs_Tb_ = 835;  // 0.835 s
-  prbs_counter_ = 0;
-
-  dphase_ = 1.0 / (params_.rate * params_.period);  // frequency * dt
-  phase_ = 0.0;
-
   mass_ = params_.mass;
   spring_ = params_.spring;
   damper_ = params_.damper;
 
   wn_ = std::sqrt(spring_ / mass_);
   zeta_ = damper_ / (2 * std::sqrt(spring_ * mass_));
+
+  // PRBS
+  prbs_settling_time_ = 835;  // 0.835 s
+  prbs_counter_ = 0;
+
+  // LPF Biquad
+  double ohm = tanf(M_PI * wn_ / params_.rate);  // using system wn as cutoff freq
+  double c = 1.0 + 2 * std::cos(M_PI / 4) * ohm + ohm * ohm;
+  b0_ = ohm * ohm / c;
+  b1_ = 2 * b0_;
+  b2_ = b0_;
+  a1_ = 2 * (ohm * ohm - 1) / c;
+  a2_ = (1.0 - 2 * std::cos(M_PI / 4) * ohm + ohm * ohm) / c;
+  u_k1_ = 0;
+  u_k2_ = 0;
+
+  dphase_ = 1.0 / (params_.rate * params_.period);  // frequency * dt
+  phase_ = 0.0;
+
   zeta_ = std::min(zeta_, 1.000);  // Disallow overdamped systems
   is_critically_damped_ = (1.000 - zeta_) < std::numeric_limits<float>::epsilon();
 
@@ -313,14 +326,14 @@ int8_t KinematicReference::squarewave()
 
 void KinematicReference::setPRBS_filtered()
 {
-  if (prbs_counter_ >= prbs_Tb_) {
+  if (prbs_counter_ >= prbs_settling_time_) {
     prbs_signal_ =
       params_.amplitude * static_cast<double>(pseudo_rand()) / pseudo_rand.max();
     prbs_counter_ = 0;
   }
   prbs_counter_++;
 
-  positions_[axis_] += prbs_signal_;
+  positions_[axis_] += lpf_biquad(prbs_signal_);
 }
 
 void KinematicReference::sinewaves()
@@ -334,6 +347,17 @@ void KinematicReference::sinewaves()
     accelerations_[axis_] = -params_.sines_amp[i] *
       ang_freq * ang_freq * std::sin(ang_freq * ellapsed_time_);
   }
+}
+
+double KinematicReference::lpf_biquad(const double sample)
+{
+  u_k0_ = sample - u_k1_ * a1_ - u_k2_ * a2_;
+  y_k_ = u_k0_ * b0_ + u_k1_ * b1_ + u_k2_ * b2_;
+
+  u_k2_ = u_k1_;
+  u_k1_ = u_k0_;
+
+  return y_k_;
 }
 
 }  // namespace kinematic_reference
