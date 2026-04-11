@@ -156,6 +156,8 @@ void ImpedanceId::update_rls()
   estimates_.data[7] = error_(0);  // regression error
 }
 
+// TODO(@qleonardolp): use `l` to zero the 2nd derivative of the ISPI points.
+
 void ImpedanceId::update_ispi()
 {
   // Point counter FSM

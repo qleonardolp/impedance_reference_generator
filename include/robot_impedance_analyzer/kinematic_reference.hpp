@@ -45,7 +45,9 @@ enum SignalType
   kStepUpDown,
   kStepSequence,
   kCPGLegTrajectory,
-  kSquarewave
+  kSquarewave,
+  kSines,
+  kPRBS,
 };
 
 std::map<std::string, uint8_t> TypeMap = {
@@ -56,8 +58,11 @@ std::map<std::string, uint8_t> TypeMap = {
   {std::string("step-sequence"), SignalType::kStepSequence},
   {std::string("cpg-trajectory"), SignalType::kCPGLegTrajectory},
   {std::string("squarewave"), SignalType::kSquarewave},
+  {std::string("sines"), SignalType::kSines},
+  {std::string("PRBS"), SignalType::kPRBS},
 };
 
+const double PI_2 = 2 * M_PI;
 const uint8_t kSpaceDim = 6;  // Cartesian space dimension
 const uint8_t kPoseDim = kSpaceDim + 1;  // position + quaternion
 const double kTimeOffset = 2.0;  // seconds
@@ -120,6 +125,11 @@ public:
   double logistic_acceleration(const double arg);
 
   /**
+   * @brief Sum of sines signal
+   */
+  void sinewaves();
+
+  /**
    * @brief Squarewave function. Uses the
    * Numerically Controlled Oscillator (NCO).
    */
@@ -144,6 +154,7 @@ private:
   std::vector<double> accelerations_;
   std::vector<double> velocities_;
   std::vector<double> positions_;
+  std::vector<double> dc_term_;  // position DC term (constant)
   std::size_t axis_;
   int signal_type_;
 

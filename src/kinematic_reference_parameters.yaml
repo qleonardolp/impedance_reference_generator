@@ -11,7 +11,8 @@ kinematic_reference:
     description: "Reference signal type.",
     validation: {
       one_of<>: [["step", "smooth-step", "sinewave",
-      "step-up-down", "step-sequence", "cpg-trajectory", "squarewave"]]
+      "step-up-down", "step-sequence", "cpg-trajectory",
+      "squarewave", "sines", "PRBS"]]
     }
   }
   initial_pose: {
@@ -53,6 +54,16 @@ kinematic_reference:
     validation: {
       gt<>: [0.0]
     }
+  }
+  sines_amp: {
+    type: double_array,
+    default_value: [],
+    description: "Sines signal amplitude array",
+  }
+  sines_freq: {
+    type: double_array,
+    default_value: [],
+    description: "Sines signal frequency [Hz] array",
   }
   mass: {
     type: double,

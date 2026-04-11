@@ -44,6 +44,7 @@ CallbackReturn KinematicReference::on_configure(
   accelerations_.resize(kSpaceDim, 0);
   velocities_.resize(kSpaceDim, 0);
   positions_.resize(kPoseDim, 0);
+  dc_term_.resize(kPoseDim, 0);
 
   return CallbackReturn::SUCCESS;
 }
@@ -67,7 +68,7 @@ CallbackReturn KinematicReference::on_activate(
   steps_name_ = params_.steps;
   signal_type_ = TypeMap[params_.signal_type];
   axis_ = ::impedance_analysis::AxisMap[*(params_.axis.c_str())];
-  angular_freq_ = 2 * M_PI / params_.period;
+  angular_freq_ = PI_2 / params_.period;
 
   phase_ = 0.0;
   dphase_ = 1.0 / (params_.rate * params_.period);  // frequency * dt
@@ -149,6 +150,7 @@ void KinematicReference::publisher_callback()
   // Initial pose ('DC' part of the signal)
   for (size_t i = 0; i < kPoseDim; i++) {
     positions_[i] = params_.initial_pose[i];
+    dc_term_[i] = params_.initial_pose[i];
   }
 
   switch (signal_type_) {
@@ -202,6 +204,9 @@ void KinematicReference::publisher_callback()
       break;
     case SignalType::kSquarewave:
       positions_[axis_] += params_.amplitude * squarewave();
+      break;
+    case SignalType::kSines:
+      sinewaves();
       break;
     default:
       break;
@@ -300,6 +305,20 @@ int8_t KinematicReference::squarewave()
   phase_ += dphase_;
   if (phase_ >= 1.0) {phase_ -= 1.0;}  // wrap
   return (phase_ < 0.5) ? 1 : -1;
+}
+
+void KinematicReference::sinewaves()
+{
+  static double ang_freq = 0.0;
+
+  positions_[axis_] = dc_term_[axis_];
+  for (size_t i = 0; i < params_.sines_amp.size(); i++) {
+    ang_freq = PI_2 * params_.sines_freq[i];
+    positions_[axis_] += params_.sines_amp[i] * std::sin(ang_freq * ellapsed_time_);
+    velocities_[axis_] = params_.sines_amp[i] * ang_freq * std::cos(ang_freq * ellapsed_time_);
+    accelerations_[axis_] = -params_.sines_amp[i] *
+      ang_freq * ang_freq * std::sin(ang_freq * ellapsed_time_);
+  }
 }
 
 }  // namespace kinematic_reference

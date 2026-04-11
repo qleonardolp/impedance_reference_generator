@@ -2,80 +2,14 @@ kinematic_reference:
   ros__parameters:
     topic_name: ur5_controller/reference
     initial_pose: [0.350, -0.10915, 0.75, 0.0, 0.0, 0.0, 1.0]
-    signal_type: sinewave
-    amplitude: 0.05
-    period: 1.0
+    signal_type: sines
     axis: 'x'
-    mass: 12.0
-    spring: 400.0
-    damper: 138.564
+    sines_amp: [0.0254, 0.012, 0.018, 0.004, 0.003, 0.020, 0.015]
+    sines_freq: [1.000, 4.500, 0.333, 9.000, 6.000, 27.00, 18.00]
     rate: 1000
-    steps:
-      - s1
-      - s2
-      - s3
-      - s4
-      - s5
-      - s6
-      - s7
-      - s8
-      - s9
-      - s10
-      - s11
-      - s12
-      - s13
-      - s14
-      - s15
-      - s16
-    steps_pose:
-      s1:
-        pose: [0.14931, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 2.0
-      s2:
-        pose: [0.640, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 2.6
-      s3:
-        pose: [0.650, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 3.0
-      s4:
-        pose: [0.630, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 4.0
-      s5:
-        pose: [0.650, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 5.0
-      s6:
-        pose: [0.644, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 5.5
-      s7:
-        pose: [0.650, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 8.5
-      s8:
-        pose: [0.640, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 9.0
-      s9:
-        pose: [0.650, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 10.0
-      s10:
-        pose: [0.637, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 11.0
-      s11:
-        pose: [0.650, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 11.9
-      s12:
-        pose: [0.655, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 12.8
-      s13:
-        pose: [0.650, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 13.7
-      s14:
-        pose: [0.645, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 14.5
-      s15:
-        pose: [0.650, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 15.4
-      s16:
-        pose: [0.630, -0.10915, 0.62136, 0.0, 0.0, 0.0, 1.0]
-        time: 16.2
+    spring: 490.0
+    damper: 140.0
+    mass: 10.0
 
 identification:
   ros__parameters:
@@ -84,6 +18,6 @@ identification:
     controller_status_topic: ur5_controller/status
     sampling_frequency: 1000.0
     cutoff_frequency: 20.0
-    expected_stiffness: 400.0
-    expected_damping: 126.491
+    expected_stiffness: 490.0
+    expected_damping: 140.0
     expected_mass: 10.0
