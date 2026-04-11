@@ -9,8 +9,8 @@ kinematic_reference:
     sines_amp: [0.010, 0.020, 0.005, 0.0254, 0.050, 0.018, 0.005]
     sines_freq: [0.007, 0.010, 0.066, 1.000, 7.000, 11.50, 14.00]
     rate: 1000
-    spring: 490.0
-    damper: 140.0
+    spring: 640.0
+    damper: 160.0
     mass: 10.0
 
 identification:
@@ -20,6 +20,6 @@ identification:
     controller_status_topic: hyl_controller/status
     sampling_frequency: 1000.0
     cutoff_frequency: 20.0
-    expected_stiffness: 490.0
-    expected_damping: 140.0
+    expected_stiffness: 640.0
+    expected_damping: 160.0
     expected_mass: 10.0
