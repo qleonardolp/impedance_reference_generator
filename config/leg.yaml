@@ -1,61 +1,11 @@
 kinematic_reference:
   ros__parameters:
-    topic_name: spot_leg_controller/reference
-    signal_type: step-sequence  # step-sequence | cpg-trajectory
-    cpg_robot_height: 0.50
+    topic_name: spot_fl_control/reference
+    signal_type: cpg-trajectory
+    initial_pose: [0.324, 0.210, -0.35, 0.0, 0.0, 0.0, 1.0]
     cpg_x_offset: 0.324
-    cpg_length: 0.40
-    period: 0.50
-    initial_pose: [0.324, 0.177, -0.40, 0.0, 0.0, 0.0, 1.0]
-    amplitude: 0.4
-    axis: 'z'
-    mass: 12.585
-    spring: 800.0
-    damper: 90.0
-    rate: 200
-    steps:
-      - start
-      - jump_1
-      - settle_1
-      - jump_2
-      - settle_2
-      - jump_3
-      - settle_3
-      - jump_4
-      - settle_4
-      - jump_5
-      - settle_5
-    steps_pose:
-      start:
-        pose: [0.324, 0.177, -0.40, 0.0, 0.0, 0.0, 1.0]
-        time: 0.0
-      jump_1:
-        pose: [0.324, 0.177, -1.50, 0.0, 0.0, 0.0, 1.0]
-        time: 2.0
-      settle_1:
-        pose: [0.324, 0.177, -0.50, 0.0, 0.0, 0.0, 1.0]
-        time: 2.2
-      jump_2:
-        pose: [0.324, 0.177, -1.50, 0.0, 0.0, 0.0, 1.0]
-        time: 6.0
-      settle_2:
-        pose: [0.324, 0.177, -0.50, 0.0, 0.0, 0.0, 1.0]
-        time: 6.2
-      jump_3:
-        pose: [0.324, 0.177, -1.50, 0.0, 0.0, 0.0, 1.0]
-        time: 10.0
-      settle_3:
-        pose: [0.324, 0.177, -0.50, 0.0, 0.0, 0.0, 1.0]
-        time: 10.2
-      jump_4:
-        pose: [0.324, 0.177, -1.50, 0.0, 0.0, 0.0, 1.0]
-        time: 14.0
-      settle_4:
-        pose: [0.324, 0.177, -0.50, 0.0, 0.0, 0.0, 1.0]
-        time: 14.2
-      jump_5:
-        pose: [0.324, 0.177, -1.50, 0.0, 0.0, 0.0, 1.0]
-        time: 18.0
-      settle_5:
-        pose: [0.324, 0.177, -0.50, 0.0, 0.0, 0.0, 1.0]
-        time: 18.2
+    cpg_robot_height: 0.37
+    cpg_length: 0.9
+    period: 0.18
+    rate: 250
+    axis: 'z' # doesn't matter for CPG
