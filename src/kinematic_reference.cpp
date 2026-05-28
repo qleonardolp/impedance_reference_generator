@@ -23,8 +23,6 @@ KinematicReference::KinematicReference(
 : rclcpp_lifecycle::LifecycleNode(node_name,
     rclcpp::NodeOptions().use_intra_process_comms(intra_process_comms))
 {
-  // could be simply `configure()`
-  trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
 }
 
 CallbackReturn KinematicReference::on_configure(
@@ -211,9 +209,9 @@ void KinematicReference::publisher_callback()
       positions_[0] =
         params_.cpg_x_offset - params_.cpg_length * cpg_amplitude() * std::cos(cpg_phase_);
       if (std::sin(cpg_phase_) > 0.0) {
-        positions_[2] = -params_.cpg_robot_height + 0.050 * std::sin(cpg_phase_);
+        positions_[2] = -params_.cpg_robot_height + 0.070 * std::sin(cpg_phase_);
       } else {
-        positions_[2] = -params_.cpg_robot_height + 0.005 * std::sin(cpg_phase_);
+        positions_[2] = -params_.cpg_robot_height + 0.009 * std::sin(cpg_phase_);
       }
       break;
     case SignalType::kSquarewave:

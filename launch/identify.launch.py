@@ -13,10 +13,15 @@
 # limitations under the License.
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, EmitEvent
+import launch.events
+
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-from launch_ros.actions import Node
+from launch_ros.actions import LifecycleNode
+from launch_ros.events.lifecycle import ChangeState
 from launch_ros.substitutions import FindPackageShare
+
+from lifecycle_msgs.msg import Transition
 
 
 def generate_launch_description():
@@ -36,23 +41,34 @@ def generate_launch_description():
         [pkg_share, 'config', [LaunchConfiguration('param_file'), '.yaml']]
     )
 
-    reference_generator = Node(
-            package='robot_impedance_analyzer',
-            executable='kinematic_reference',
-            name='kinematic_reference',
-            parameters=[param_file_path],
+    reference_generator = LifecycleNode(
+        package='robot_impedance_analyzer',
+        executable='kinematic_reference',
+        name='kinematic_reference',
+        namespace='',
+        autostart=True,  # configure and activate LifecycleNode
+        parameters=[param_file_path],
         )
 
-    system_identification = Node(
-            package='robot_impedance_analyzer',
-            executable='identification',
-            name='identification',
-            parameters=[param_file_path],
+    system_identification = LifecycleNode(
+        package='robot_impedance_analyzer',
+        executable='identification',
+        name='identification',
+        namespace='',
+        parameters=[param_file_path],
         )
+
+    config_system_identification = EmitEvent(
+        event=ChangeState(
+            lifecycle_node_matcher=launch.events.matches_action(system_identification),
+            transition_id=Transition.TRANSITION_CONFIGURE,
+        )
+    )
 
     nodes = [
         reference_generator,
         system_identification,
+        config_system_identification,
     ]
 
     return LaunchDescription(arguments + nodes)

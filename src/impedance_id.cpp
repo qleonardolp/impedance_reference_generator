@@ -21,7 +21,6 @@ ImpedanceId::ImpedanceId(
 : rclcpp_lifecycle::LifecycleNode(node_name,
     rclcpp::NodeOptions().use_intra_process_comms(intra_process_comms))
 {
-  configure();  // self configure
 }
 
 CallbackReturn ImpedanceId::on_configure(
