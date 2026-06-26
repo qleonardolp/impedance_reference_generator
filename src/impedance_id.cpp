@@ -51,19 +51,20 @@ CallbackReturn ImpedanceId::on_activate(
 
   axis_ = ::impedance_analysis::AxisMap[*(params_.axis.c_str())];
 
-  double beta = 2 * M_PI * params_.cutoff_frequency / params_.sampling_frequency;
+  sampling_dt_ = 1.0 / params_.sampling_frequency;
+  double beta = 2 * M_PI * params_.cutoff_frequency * sampling_dt_;
   lpf_alpha_ = beta / (beta + 1);
 
   /* RLS */
-  phi_.setOnes();
+  phi_.setZero();
+  phi_(1) = sampling_dt_;
   error_.setZero();
-  theta_.setZero();
-  theta_(0) = 1.0;
+  theta_.setOnes();
   theta_last_ = theta_;
   rls_gain_den_ = 1.0;
   cov_k_ = 1'000 * CovarianceMatrix::Identity();
-  k_m_ratio_ = params_.expected_stiffness / params_.expected_mass;
-  d_m_ratio_ = params_.expected_damping / params_.expected_mass;
+  designed_k_ = params_.expected_stiffness;
+  designed_d_ = params_.expected_damping;
 
   /* ISPI */
   point_counter_ = 0;
@@ -104,11 +105,11 @@ CallbackReturn ImpedanceId::on_shutdown(
 
 void ImpedanceId::output_callback(const std_msgs::msg::Float64MultiArray & status_msg)
 {
-  delta_t_ = 1E-9 * static_cast<double>((get_clock()->now() - last_clock_).nanoseconds());
+  delta_t_ = (get_clock()->now() - last_clock_).seconds();
 
-  new_output_(0) = status_msg.data[kDevId + axis_];  // deviation
-  new_output_(1) = status_msg.data[kVelId + axis_];  // deviation derivative
-  new_output_(2) = status_msg.data[kAccId + axis_];  // deviation 2nd derivative
+  new_input_(0) = status_msg.data[kDevId + axis_];  // deviation
+  new_input_(1) = status_msg.data[kVelId + axis_];  // deviation derivative
+  new_input_(2) = status_msg.data[kAccId + axis_];  // f_int
 
   step_detected_ =
     abs(status_msg.data[kDevId + axis_] - new_point_(0)) > kPosDeltaThreshold;
@@ -117,16 +118,18 @@ void ImpedanceId::output_callback(const std_msgs::msg::Float64MultiArray & statu
   if (!step_detected_) {
     new_point_(0) = status_msg.data[kDevId + axis_];
     new_point_(1) = status_msg.data[kVelId + axis_];
-    new_point_(2) = status_msg.data[kAccId + axis_];
+    new_point_(2) = (new_point_(1) - de_last_) / delta_t_;  // deviation 2nd derivative
   }
 
-  if (!new_output_.hasNaN()) {
+  if (!new_input_.hasNaN()) {
     update_rls();
   }
 
   if (!new_point_.hasNaN()) {
     update_ispi();
   }
+
+  de_last_ = status_msg.data[kVelId + axis_];
 
   param_publisher_->publish(estimates_);
   last_clock_ = get_clock()->now();
@@ -135,23 +138,25 @@ void ImpedanceId::output_callback(const std_msgs::msg::Float64MultiArray & statu
 void ImpedanceId::update_rls()
 {
   // Update the regression vector
-  phi_(0) = (k_m_ratio_ * new_output_(0) + d_m_ratio_ * new_output_(1)) * (-1);
-  phi_(1) = 1.0 / params_.expected_mass;
+  phi_(0) = de_last_ - new_input_(1);  // dv * (-1)
+  phi_(1) = sampling_dt_;
 
   // Update Gain
   rls_gain_den_ = lambda_ + phi_.transpose() * cov_k_ * phi_;
   gain_k_.noalias() = (cov_k_ * phi_) / rls_gain_den_;
 
   // Update error
-  error_.noalias() = new_output_.tail<kSpaceDim>() - theta_.transpose() * phi_;
+  regression_ref_(0) =
+    (new_input_(2) - designed_k_ * new_input_(0) - designed_d_ * new_input_(1)) * sampling_dt_;
+  error_.noalias() = regression_ref_ - theta_.transpose() * phi_;
 
   // New estimation
   theta_ = theta_ + gain_k_ * error_.transpose();
   // New covariance
   cov_k_ = (CovarianceMatrix::Identity() - gain_k_ * phi_.transpose()) * cov_k_ / lambda_;
 
-  estimates_.data[5] = theta_(0);  // s
-  estimates_.data[6] = theta_(1);  // l
+  estimates_.data[5] = theta_(0);  // m
+  estimates_.data[6] = theta_(1);  // b
   estimates_.data[7] = error_(0);  // regression error
 }
 
@@ -206,9 +211,9 @@ void ImpedanceId::update_ispi()
   // plane with `d` = 0, i.e., f_int = 0.
   dde_offset_ = plane_n_filt_.dot(first_last_) / plane_n_filt_(2);
 
-  estimates_.data[0] = abs(plane_n_filt_(0));
-  estimates_.data[1] = abs(plane_n_filt_(1));
-  estimates_.data[2] = abs(plane_n_filt_(2));
+  estimates_.data[0] = plane_n_filt_(0);
+  estimates_.data[1] = plane_n_filt_(1);
+  estimates_.data[2] = plane_n_filt_(2);
   estimates_.data[3] = cluster_area_;
   estimates_.data[4] = dde_offset_;
 }

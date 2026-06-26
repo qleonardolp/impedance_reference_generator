@@ -44,12 +44,12 @@ const size_t kDevId = 6;
 const size_t kVelId = 12;
 // Status msg accel deviation zero index
 const size_t kAccId = 18;
-// Output vector y is [e, \dot{e}, \ddot{e}]^T
+// Output vector y is [e, \dot{e}, f_{int}]^T
 const uint8_t kOutputDim = 3;
 
 const uint8_t kSpaceDim = 1;  // TODO(@me): refact for multi-axis identification
 const uint8_t kPoseDim = 7;   // position + quaternion
-// Regression vector \phi is [ -(k/m * e + d/m * \dot{e}), 1/m ]^T
+// Regression vector \phi is [ -(v_k - v_{k-1}), dt ]^T
 const size_t kPhiSize = kSpaceDim * 2;
 
 typedef Eigen::Matrix<double, kPhiSize, kPhiSize> CovarianceMatrix;
@@ -106,6 +106,7 @@ private:
 
   rclcpp::Time last_clock_;
   double delta_t_;  // time delta
+  double sampling_dt_;  // Fixed dt from sampling frequency
 
   std::shared_ptr<ParamListener> param_listener_;
   Params params_;
@@ -122,7 +123,7 @@ private:
   Eigen::Vector3d fused_theta_;
 
   /* Recursive Least Squares (RLS) class members */
-  double lambda_{0.889};  // RLS forgetting factor, N ~ 1/(1 - lambda_)
+  double lambda_{0.9988};  // RLS forgetting factor, N ~ 1/(1 - lambda_)
   // Estimated parameters
   Eigen::Matrix<double, kPhiSize, kSpaceDim> theta_;
   // Estimated parameters (last)
@@ -134,16 +135,19 @@ private:
   // Gain (K_k)
   Eigen::Vector<double, kPhiSize> gain_k_;
   double rls_gain_den_{1.0};
-  // Designed k/m
-  double k_m_ratio_;
-  // Designed d/m
-  double d_m_ratio_;
+  // Designed k
+  double designed_k_;
+  // Designed d
+  double designed_d_;
 
-  Eigen::Vector<double, kSpaceDim * kOutputDim> new_output_;  // e, de, dde
-  // From the 1-DoF equivalence (CBA2026), we have:
-  // dde = s * (-k/m *e - d/m *\dot{e}) + l *(1/m)
-  // Then, error = dde - s * (-k/m *e - d/m *\dot{e}) - l *(1/m) ~ 0
+  Eigen::Vector<double, kSpaceDim * kOutputDim> new_input_;
+  // Discrete equation (1-DoF):
+  // m*(v_k - v_{k-1}) = dt*u + dt*b
+  // where u = f_int - d*\dot{e} - k*e
+  // Then, error = dt*u - m*(v_k - v_{k-1}) + dt*b ~ 0
   Eigen::Vector<double, kSpaceDim> error_;
+  // Linear regression reference value.
+  Eigen::Vector<double, kSpaceDim> regression_ref_;
   /* End of RLS class members */
 
   /* Impedance space planar identification (ISPI) class members */
@@ -159,6 +163,7 @@ private:
   uint8_t point_counter_;         // plane points counter (<= 3)
   double cluster_area_;           // area spanned by the three points
   double dde_offset_;             // acceleration offset due to residual f_int
+  double de_last_;                // last(k-1) deviation derivative
   double plane_d_;                // plane `d` (a*x + b*y + c*z + d = 0)
   /* End of ISPI class members */
 };
