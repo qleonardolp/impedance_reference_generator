@@ -43,11 +43,11 @@ enum SignalType
   kStep,
   kSmoothStep,
   kSineWave,
-  kStepUpDown,
   kStepSequence,
   kCPGLegTrajectory,
   kSquarewave,
   kSines,
+  kChirp,
   kPRBS,
 };
 
@@ -55,11 +55,11 @@ std::map<std::string, uint8_t> TypeMap = {
   {std::string("step"), SignalType::kStep},
   {std::string("smooth-step"), SignalType::kSmoothStep},
   {std::string("sinewave"), SignalType::kSineWave},
-  {std::string("step-up-down"), SignalType::kStepUpDown},
   {std::string("step-sequence"), SignalType::kStepSequence},
   {std::string("cpg-trajectory"), SignalType::kCPGLegTrajectory},
   {std::string("squarewave"), SignalType::kSquarewave},
   {std::string("sines"), SignalType::kSines},
+  {std::string("chirp"), SignalType::kChirp},
   {std::string("PRBS"), SignalType::kPRBS},
 };
 
@@ -92,15 +92,6 @@ public:
 
   CallbackReturn on_shutdown(const rclcpp_lifecycle::State & previous_state) override;
 
-
-  /**
-   * @brief Compute the mechanical work (power) required by
-   * a mass-spring-damper (MSD) when a step input is set for the
-   * equilibrium point, i.e. the desired position. Desired velocity
-   * and acceleration are zero.
-   */
-  void step_power(const double time);
-
   /**
    * @brief Integrate the Central Pattern Generator amplitude equation
    * according to https://doi.org/10.1109/IROS58592.2024.10802762
@@ -108,48 +99,56 @@ public:
   double cpg_amplitude();
 
   /**
-   * @brief Approximate a (Heaviside) step function by
-   * the Logistic function, which is differentiable.
-   *
-   * The Logistic function is f(x) = 1 / (1 + exp(-x))
+   * @brief Step signal callback
    */
-  double logistic_function(const double arg);
+  void step_callback();
 
   /**
-   * @brief Logistic function first order derivative
+   * @brief Sine signal callback
    */
-  double logistic_velocity(const double arg);
+  void sinewave_callback();
 
   /**
-   * @brief Logistic function second order derivative
+   * @brief Step sequence callback
    */
-  double logistic_acceleration(const double arg);
+  void stepseq_callback();
 
   /**
-   * @brief Pseudo Random Binary Signal (PRBS)
+   * @brief Central Pattern Generator callback
    */
-  void setPRBS_filtered();
+  void cpg_callback();
 
   /**
-   * @brief Sum of sines signal
+   * @brief Squarewave signal callback.
+   * Signal is based on Numerically Controlled Oscillator (NCO).
    */
-  void sinewaves();
+  void squarewave_callback();
 
   /**
-   * @brief Squarewave function. Uses the
-   * Numerically Controlled Oscillator (NCO).
+   * @brief Sines signal callback
    */
-  int8_t squarewave();
+  void sines_callback();
 
   /**
-   * @brief Reference signal publisher callback
+   * @brief Pseudo Random Binary Signal (PRBS) callback
    */
-  void publisher_callback();
+  void prbs_callback();
+
+  /**
+   * @brief Chirp signal callback
+   */
+  void chirp_callback();
 
   /**
    * @brief Second order low pass filter
    */
   double lpf_biquad(const double sample);
+
+  /**
+   * @brief Update `message_` with positions_,
+   * velocities_, and accelerations_.
+   */
+  void set_message();
 
 private:
   std::shared_ptr<rclcpp::TimerBase> timer_;
@@ -168,51 +167,17 @@ private:
   std::size_t axis_;
   int signal_type_;
 
-  std::vector<std::string> steps_name_;
   std::shared_ptr<ParamListener> param_listener_;
   Params params_;
 
-  std::shared_ptr<rclcpp::Publisher<std_msgs::msg::Float64>> power_publisher_;
-  std_msgs::msg::Float64 power_;
-
   // PRBS random number generator (32 bits)
   std::minstd_rand pseudo_rand;
-  // PRBS raw signal
-  double prbs_signal_;
-  // System settling time (in k) for PRBS
-  uint prbs_settling_time_;
-  // PRBS time (in k) counter
-  uint prbs_counter_;
 
   // LPF Biquad
   double y_k_;
   double u_k0_, u_k1_, u_k2_;
   double b0_, b1_, b2_;
   double a1_, a2_;
-
-  double mass_;
-  double spring_;
-  double damper_;
-
-  // Flag to indicate if is critically damped
-  bool is_critically_damped_{false};
-  // Undamped natural frequency
-  double wn_;
-  // Damping factor
-  double zeta_;
-  // Damped frequency
-  double wd_;
-  // Sigma
-  double sigma_;
-  // Beta
-  double beta_;
-  // Chi
-  double chi_;
-
-  // NCO phase
-  double phase_;
-  // NCO phase step
-  double dphase_;
 };
 
 }  // namespace kinematic_reference

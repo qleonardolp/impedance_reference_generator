@@ -10,9 +10,8 @@ kinematic_reference:
     default_value: "step",
     description: "Reference signal type.",
     validation: {
-      one_of<>: [["step", "smooth-step", "sinewave",
-      "step-up-down", "step-sequence", "cpg-trajectory",
-      "squarewave", "sines", "PRBS"]]
+      one_of<>: [["step", "sinewave", "squarewave", "sines",
+       "step-sequence", "cpg-trajectory", "PRBS", "chirp"]]
     }
   }
   initial_pose: {
@@ -135,4 +134,14 @@ kinematic_reference:
     type: double,
     default_value: 0.0,
     description: "Step x offset for Central Pattern Generator.",
+  }
+  chirp_final_frequency: {
+    type: double,
+    default_value: 50.0,
+    description: "Chirp signal final frequency.",
+  }
+  chirp_time: {
+    type: double,
+    default_value: 20.0,
+    description: "Chirp signal final frequency.",
   }

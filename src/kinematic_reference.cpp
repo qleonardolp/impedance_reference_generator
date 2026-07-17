@@ -36,8 +36,6 @@ CallbackReturn KinematicReference::on_configure(
   qos_lowlatency.liveliness(RMW_QOS_POLICY_LIVELINESS_AUTOMATIC);
 
   publisher_ = create_publisher<KinematicPose>(params_.topic_name, qos_lowlatency);
-  power_publisher_ = create_publisher<std_msgs::msg::Float64>(
-    "~/step_power", qos_lowlatency);
 
   accelerations_.resize(kSpaceDim, 0);
   velocities_.resize(kSpaceDim, 0);
@@ -51,7 +49,6 @@ CallbackReturn KinematicReference::on_cleanup(
 {
   timer_.reset();
   publisher_.reset();
-  power_publisher_.reset();
   param_listener_.reset();
   return CallbackReturn::SUCCESS;
 }
@@ -62,24 +59,60 @@ CallbackReturn KinematicReference::on_activate(
   param_listener_->refresh_dynamic_parameters();
   params_ = param_listener_->get_params();
 
-  steps_name_ = params_.steps;
   signal_type_ = TypeMap[params_.signal_type];
   axis_ = ::impedance_analysis::AxisMap[*(params_.axis.c_str())];
+  uint timer_ms = static_cast<uint>(1000.0 / params_.rate);
+  start_time_ = this->get_clock()->now();
+
+  switch (signal_type_) {
+    case SignalType::kStep:
+      timer_ = this->create_timer(
+        std::chrono::milliseconds(timer_ms),
+        std::bind(&KinematicReference::step_callback, this));
+      break;
+    case SignalType::kSineWave:
+      timer_ = this->create_timer(
+        std::chrono::milliseconds(timer_ms),
+        std::bind(&KinematicReference::sinewave_callback, this));
+      break;
+    case SignalType::kStepSequence:
+      timer_ = this->create_timer(
+        std::chrono::milliseconds(timer_ms),
+        std::bind(&KinematicReference::stepseq_callback, this));
+      break;
+    case SignalType::kCPGLegTrajectory:
+      timer_ = this->create_timer(
+        std::chrono::milliseconds(timer_ms),
+        std::bind(&KinematicReference::cpg_callback, this));
+      break;
+    case SignalType::kSquarewave:
+      timer_ = this->create_timer(
+        std::chrono::milliseconds(timer_ms),
+        std::bind(&KinematicReference::squarewave_callback, this));
+      break;
+    case SignalType::kSines:
+      timer_ = this->create_timer(
+        std::chrono::milliseconds(timer_ms),
+        std::bind(&KinematicReference::sines_callback, this));
+      break;
+    case SignalType::kPRBS:
+      timer_ = this->create_timer(
+        std::chrono::milliseconds(timer_ms),
+        std::bind(&KinematicReference::prbs_callback, this));
+      break;
+    case SignalType::kChirp:
+      timer_ = this->create_timer(
+        std::chrono::milliseconds(timer_ms),
+        std::bind(&KinematicReference::chirp_callback, this));
+      break;
+    default:
+      break;
+  }
+
   angular_freq_ = PI_2 / params_.period;
 
-  mass_ = params_.mass;
-  spring_ = params_.spring;
-  damper_ = params_.damper;
-
-  wn_ = std::sqrt(spring_ / mass_);
-  zeta_ = damper_ / (2 * std::sqrt(spring_ * mass_));
-
-  // PRBS
-  prbs_settling_time_ = 835;  // 0.835 s
-  prbs_counter_ = 0;
-
   // LPF Biquad
-  double ohm = tanf(M_PI * wn_ / params_.rate);  // using system wn as cutoff freq
+  double ohm = tanf(M_PI * 0.1);  // using system wn as cutoff freq
   double c = 1.0 + 2 * std::cos(M_PI / 4) * ohm + ohm * ohm;
   b0_ = ohm * ohm / c;
   b1_ = 2 * b0_;
@@ -89,31 +122,10 @@ CallbackReturn KinematicReference::on_activate(
   u_k1_ = 0;
   u_k2_ = 0;
 
-  dphase_ = 1.0 / (params_.rate * params_.period);  // frequency * dt
-  phase_ = 0.0;
-
-  zeta_ = std::min(zeta_, 1.000);  // Disallow overdamped systems
-  is_critically_damped_ = (1.000 - zeta_) < std::numeric_limits<float>::epsilon();
-
-  if (is_critically_damped_) {
-    RCLCPP_WARN(get_logger(),
-      "MSD system is critically damped. \u03B6: %.4f, \u03C9: %.4f", zeta_, wn_);
-    chi_ = 1.0;
-    wd_ = 0.0;
-  } else {
-    chi_ = std::sqrt(1.0 - zeta_ * zeta_);
-    wd_ = wn_ * chi_;
-  }
-  beta_ = std::atan(zeta_ / chi_);
-  sigma_ = wn_ * zeta_;
-
   accelerations_.assign(kSpaceDim, 0);
   velocities_.assign(kSpaceDim, 0);
 
-  message_ = KinematicPose();
-
   publisher_period_ = 1.0 / params_.rate;
-  uint timer_period = static_cast<uint>(1000.0 / params_.rate);
 
   if (signal_type_ == SignalType::kStepSequence || signal_type_ == SignalType::kCPGLegTrajectory) {
     RCLCPP_INFO(get_logger(),
@@ -126,11 +138,6 @@ CallbackReturn KinematicReference::on_activate(
       axis_
     );
   }
-
-  start_time_ = this->get_clock()->now();
-  timer_ = this->create_timer(
-    std::chrono::milliseconds(timer_period),
-    std::bind(&KinematicReference::publisher_callback, this));
   return CallbackReturn::SUCCESS;
 }
 
@@ -151,39 +158,15 @@ CallbackReturn KinematicReference::on_shutdown(
   return CallbackReturn::SUCCESS;
 }
 
+/*
 void KinematicReference::publisher_callback()
 {
-  static double smooth_time = 0.0;
-
-  ellapsed_time_ = static_cast<double>(
-    (get_clock()->now() - start_time_).nanoseconds()) * 1E-9;
-
-  smooth_time = ellapsed_time_ - kTimeOffset;
-
   // Initial pose ('DC' part of the signal)
   for (size_t i = 0; i < kPoseDim; i++) {
     positions_[i] = params_.initial_pose[i];
   }
 
   switch (signal_type_) {
-    case SignalType::kStep:
-      positions_[axis_] +=
-        ellapsed_time_ > kTimeOffset ? params_.amplitude : 0.0;
-      if (ellapsed_time_ > kTimeOffset) {
-        step_power(smooth_time);
-      }
-      break;
-    case SignalType::kSmoothStep:
-      if (smooth_time < kSmoothStepEnd) {
-        positions_[axis_] += logistic_function(smooth_time);
-        velocities_[axis_] = logistic_velocity(smooth_time);
-        accelerations_[axis_] = logistic_acceleration(smooth_time);
-      } else {
-        positions_[axis_] += params_.amplitude;
-        velocities_[axis_] = 0.0;
-        accelerations_[axis_] = 0.0;
-      }
-      break;
     case SignalType::kSineWave:
       positions_[axis_] +=
         params_.amplitude * std::sin(angular_freq_ * ellapsed_time_);
@@ -191,18 +174,6 @@ void KinematicReference::publisher_callback()
         params_.amplitude * angular_freq_ * std::cos(angular_freq_ * ellapsed_time_);
       accelerations_[axis_] =
         -params_.amplitude * std::pow(angular_freq_, 2) * std::sin(angular_freq_ * ellapsed_time_);
-      break;
-    case SignalType::kStepUpDown:
-      /* code */
-      break;
-    case SignalType::kStepSequence:
-      for (size_t k = 0; k < steps_name_.size(); ++k) {
-        if (ellapsed_time_ > params_.steps_pose.steps_map[steps_name_[k]].time) {
-          for (size_t i = 0; i < kPoseDim; ++i) {
-            positions_[i] = params_.steps_pose.steps_map[steps_name_[k]].pose[i];
-          }
-        }
-      }
       break;
     case SignalType::kCPGLegTrajectory:
       cpg_phase_ = angular_freq_ * ellapsed_time_;
@@ -214,19 +185,146 @@ void KinematicReference::publisher_callback()
         positions_[2] = -params_.cpg_robot_height + 0.009 * std::sin(cpg_phase_);
       }
       break;
-    case SignalType::kSquarewave:
-      positions_[axis_] += params_.amplitude * squarewave();
-      break;
-    case SignalType::kSines:
-      sinewaves();
-      break;
-    case SignalType::kPRBS:
-      setPRBS_filtered();
-      break;
     default:
       break;
   }
 
+}
+*/
+
+double KinematicReference::cpg_amplitude()
+{
+  static double ree = 1e-6;
+
+  ree += publisher_period_ * (50.0 * (1.0 - ree * ree) * ree);
+  return ree;
+}
+
+double KinematicReference::lpf_biquad(const double sample)
+{
+  u_k0_ = sample - u_k1_ * a1_ - u_k2_ * a2_;
+  y_k_ = u_k0_ * b0_ + u_k1_ * b1_ + u_k2_ * b2_;
+
+  u_k2_ = u_k1_;
+  u_k1_ = u_k0_;
+
+  return y_k_;
+}
+
+void KinematicReference::step_callback()
+{
+  ellapsed_time_ = (get_clock()->now() - start_time_).seconds();
+
+  positions_[axis_] = params_.initial_pose[axis_];
+  positions_[axis_] += ellapsed_time_ > kTimeOffset ? params_.amplitude : 0.0;
+
+  set_message();
+  publisher_->publish(message_);
+}
+
+void KinematicReference::sinewave_callback()
+{
+  set_message();
+  publisher_->publish(message_);
+}
+
+void KinematicReference::stepseq_callback()
+{
+  ellapsed_time_ = (get_clock()->now() - start_time_).seconds();
+
+  for (size_t k = 0; k < params_.steps.size(); ++k) {
+    if (ellapsed_time_ > params_.steps_pose.steps_map[params_.steps[k]].time) {
+      for (size_t i = 0; i < kPoseDim; ++i) {
+        positions_[i] = params_.steps_pose.steps_map[params_.steps[k]].pose[i];
+      }
+    }
+  }
+
+  set_message();
+  publisher_->publish(message_);
+}
+
+void KinematicReference::cpg_callback()
+{
+  set_message();
+  publisher_->publish(message_);
+}
+
+void KinematicReference::squarewave_callback()
+{
+  static double phase_ = 0.0;
+  static double dphase_ = 0.0;
+
+  dphase_ = 1.0 / (params_.rate * params_.period);  // frequency * dt
+
+  phase_ += dphase_;
+  if (phase_ >= 1.0) {phase_ -= 1.0;}  // wrap
+
+  positions_[axis_] = params_.initial_pose[axis_] + params_.amplitude * ((phase_ < 0.5) ? 1 : -1);
+
+  set_message();
+  publisher_->publish(message_);
+}
+
+void KinematicReference::sines_callback()
+{
+  static double ang_freq = 0.0;
+
+  ellapsed_time_ = (get_clock()->now() - start_time_).seconds();
+  positions_[axis_] = params_.initial_pose[axis_];  // DC component
+  accelerations_[axis_] = 0.0;
+  velocities_[axis_] = 0.0;
+
+  for (size_t i = 0; i < params_.sines_amp.size(); i++) {
+    ang_freq = PI_2 * params_.sines_freq[i];
+    positions_[axis_] += params_.sines_amp[i] * std::sin(ang_freq * ellapsed_time_);
+    velocities_[axis_] += params_.sines_amp[i] * ang_freq * std::cos(ang_freq * ellapsed_time_);
+    accelerations_[axis_] += -params_.sines_amp[i] *
+      ang_freq * ang_freq * std::sin(ang_freq * ellapsed_time_);
+  }
+
+  set_message();
+  publisher_->publish(message_);
+}
+
+void KinematicReference::prbs_callback()
+{
+  static double prbs_settling_time_ = 835;  // 0.835 s
+  static double prbs_signal_ = 0.0;
+  static uint prbs_counter_ = 0;
+
+  if (prbs_counter_ >= prbs_settling_time_) {
+    prbs_signal_ =
+      params_.amplitude * static_cast<double>(pseudo_rand()) / pseudo_rand.max();
+    prbs_counter_ = 0;
+  }
+  prbs_counter_++;
+
+  positions_[axis_] = params_.initial_pose[axis_] + lpf_biquad(prbs_signal_);
+
+  set_message();
+  publisher_->publish(message_);
+}
+
+void KinematicReference::chirp_callback()
+{
+  static double frequency = 0;
+  static double chirp_rate = params_.chirp_final_frequency / params_.chirp_time;
+
+  ellapsed_time_ = (get_clock()->now() - start_time_).seconds();
+
+  frequency = std::min(chirp_rate * ellapsed_time_, params_.chirp_final_frequency);
+  positions_[axis_] = params_.initial_pose[axis_] +
+    params_.amplitude * std::sin(PI_2 * frequency * ellapsed_time_);
+  velocities_[axis_] = 2 * PI_2 * chirp_rate * ellapsed_time_ * params_.amplitude *
+    std::cos(PI_2 * frequency * ellapsed_time_);  // chain rule
+
+  set_message();
+  publisher_->publish(message_);
+}
+
+void KinematicReference::set_message()
+{
   message_.pose.position.x = positions_[0];
   message_.pose.position.y = positions_[1];
   message_.pose.position.z = positions_[2];
@@ -249,113 +347,6 @@ void KinematicReference::publisher_callback()
   message_.pose_accel.angular.x = accelerations_[3];
   message_.pose_accel.angular.y = accelerations_[4];
   message_.pose_accel.angular.z = accelerations_[5];
-
-  publisher_->publish(message_);
-}
-
-double KinematicReference::logistic_function(const double arg)
-{
-  return params_.amplitude / (1.0 + std::exp(-kSmoothStepSlope * arg));
-}
-
-double KinematicReference::logistic_velocity(const double arg)
-{
-  return params_.amplitude * kSmoothStepSlope *
-         std::exp(kSmoothStepSlope * arg) / std::pow(1.0 + std::exp(kSmoothStepSlope * arg), 2);
-}
-
-double KinematicReference::logistic_acceleration(const double arg)
-{
-  static double exp_arg = 0.0;
-  static double coeff = 0.0;
-  static double num = 0.0;
-  static double den = 1.0;
-
-  exp_arg = std::exp(-kSmoothStepSlope * arg);
-  coeff = params_.amplitude * kSmoothStepSlope * kSmoothStepSlope;
-  num = exp_arg * (exp_arg - 1.0);
-  den = std::pow(exp_arg + 1.0, 3);
-  return coeff * (num / den);
-}
-
-void KinematicReference::step_power(const double time)
-{
-  static double expt = 0.0;
-  static double pos = 0.0;
-  static double vel = 0.0;
-
-  expt = std::exp(-sigma_ * time);
-
-  if (is_critically_damped_) {  // Ogata, pg. 152
-    // Problem: these equations doesn't work well(?) with a
-    // critically damped systems (ζ = 1). Maybe for high
-    // natural frequency, i.e. high stiffness, a step will
-    // generate little to none power, since the displacement
-    // is low, thus the velocity is low too.
-    pos = 1.0 - expt * (1.0 + wn_ * time);
-    vel = wn_ * wn_ * expt * time;
-  } else {
-    pos = 1.0 - (expt / chi_) * std::cos(wd_ * time - beta_);
-    vel = expt * (wn_ / chi_) * std::sin(wd_ * time);
-  }
-
-  // Non-unary step scaling
-  pos *= params_.amplitude;
-  vel *= params_.amplitude;
-
-  power_.data = vel * (spring_ * (params_.amplitude - pos) - damper_ * vel);
-  power_publisher_->publish(power_);
-}
-
-double KinematicReference::cpg_amplitude()
-{
-  static double ree = 1e-6;
-
-  ree += publisher_period_ * (50.0 * (1.0 - ree * ree) * ree);
-  return ree;
-}
-
-int8_t KinematicReference::squarewave()
-{
-  phase_ += dphase_;
-  if (phase_ >= 1.0) {phase_ -= 1.0;}  // wrap
-  return (phase_ < 0.5) ? 1 : -1;
-}
-
-void KinematicReference::setPRBS_filtered()
-{
-  if (prbs_counter_ >= prbs_settling_time_) {
-    prbs_signal_ =
-      params_.amplitude * static_cast<double>(pseudo_rand()) / pseudo_rand.max();
-    prbs_counter_ = 0;
-  }
-  prbs_counter_++;
-
-  positions_[axis_] += lpf_biquad(prbs_signal_);
-}
-
-void KinematicReference::sinewaves()
-{
-  static double ang_freq = 0.0;
-
-  for (size_t i = 0; i < params_.sines_amp.size(); i++) {
-    ang_freq = PI_2 * params_.sines_freq[i];
-    positions_[axis_] += params_.sines_amp[i] * std::sin(ang_freq * ellapsed_time_);
-    velocities_[axis_] = params_.sines_amp[i] * ang_freq * std::cos(ang_freq * ellapsed_time_);
-    accelerations_[axis_] = -params_.sines_amp[i] *
-      ang_freq * ang_freq * std::sin(ang_freq * ellapsed_time_);
-  }
-}
-
-double KinematicReference::lpf_biquad(const double sample)
-{
-  u_k0_ = sample - u_k1_ * a1_ - u_k2_ * a2_;
-  y_k_ = u_k0_ * b0_ + u_k1_ * b1_ + u_k2_ * b2_;
-
-  u_k2_ = u_k1_;
-  u_k1_ = u_k0_;
-
-  return y_k_;
 }
 
 }  // namespace kinematic_reference
