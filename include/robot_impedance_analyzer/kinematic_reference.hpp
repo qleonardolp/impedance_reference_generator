@@ -156,7 +156,7 @@ private:
   KinematicPose message_;
 
   rclcpp::Time start_time_;
-  double publisher_period_{0};
+  double timer_period_{0};
   double ellapsed_time_{0};
   double angular_freq_{1};
   double cpg_phase_{0};
@@ -172,12 +172,6 @@ private:
 
   // PRBS random number generator (32 bits)
   std::minstd_rand pseudo_rand;
-
-  // LPF Biquad
-  double y_k_;
-  double u_k0_, u_k1_, u_k2_;
-  double b0_, b1_, b2_;
-  double a1_, a2_;
 };
 
 }  // namespace kinematic_reference

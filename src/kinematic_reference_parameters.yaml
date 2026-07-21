@@ -64,33 +64,6 @@ kinematic_reference:
     default_value: [],
     description: "Sines signal frequency [Hz] array",
   }
-  mass: {
-    type: double,
-    default_value: 1.0,
-    description: "Mass-spring-damper lumped parameter
-    to compute the step input mechanical work, i.e. power.",
-    validation: {
-      gt<>: [0.0]
-    }
-  }
-  spring: {
-    type: double,
-    default_value: 1.0,
-    description: "Mass-spring-damper lumped parameter
-    to compute the step input mechanical work, i.e. power.",
-    validation: {
-      gt<>: [0.0]
-    }
-  }
-  damper: {
-    type: double,
-    default_value: 1.0,
-    description: "Mass-spring-damper lumped parameter
-    to compute the step input mechanical work, i.e. power.",
-    validation: {
-      gt<>: [0.0]
-    }
-  }
   steps: {
     type: string_array,
     default_value: [],
@@ -100,7 +73,7 @@ kinematic_reference:
     __map_steps:
       pose: {
         type: double_array,
-        default_value: [], 
+        default_value: [],
         description: "Step end pose.",
         validation: {
           fixed_size<>: [7]

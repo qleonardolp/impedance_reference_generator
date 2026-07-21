@@ -2,16 +2,15 @@ kinematic_reference:
   ros__parameters:
     topic_name: hyl_controller/reference
     initial_pose: [0.0, 0.13, -0.4534, 0.0, -0.4792, 0.0, 0.8776]
-    signal_type: PRBS  # squarewave
+    signal_type: chirp  # squarewave
+    chirp_final_frequency: 5.0
+    chirp_time: 10.0
     amplitude: 0.050
     period: 1.7
-    axis: z
+    axis: x
     sines_amp: [0.010, 0.020, 0.005, 0.0254, 0.050, 0.018, 0.005]
     sines_freq: [0.007, 0.010, 0.066, 1.000, 7.000, 11.50, 14.00]
-    rate: 1000
-    spring: 640.0
-    damper: 160.0
-    mass: 10.0
+    rate: 500
 
 identification:
   ros__parameters:

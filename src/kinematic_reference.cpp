@@ -59,9 +59,14 @@ CallbackReturn KinematicReference::on_activate(
   param_listener_->refresh_dynamic_parameters();
   params_ = param_listener_->get_params();
 
+  positions_ = params_.initial_pose;
+  accelerations_.assign(kSpaceDim, 0);
+  velocities_.assign(kSpaceDim, 0);
+
   signal_type_ = TypeMap[params_.signal_type];
   axis_ = ::impedance_analysis::AxisMap[*(params_.axis.c_str())];
   uint timer_ms = static_cast<uint>(1000.0 / params_.rate);
+  timer_period_ = 1.0 / static_cast<double>(params_.rate);
   start_time_ = this->get_clock()->now();
 
   switch (signal_type_) {
@@ -111,23 +116,9 @@ CallbackReturn KinematicReference::on_activate(
 
   angular_freq_ = PI_2 / params_.period;
 
-  // LPF Biquad
-  double ohm = tanf(M_PI * 0.1);  // using system wn as cutoff freq
-  double c = 1.0 + 2 * std::cos(M_PI / 4) * ohm + ohm * ohm;
-  b0_ = ohm * ohm / c;
-  b1_ = 2 * b0_;
-  b2_ = b0_;
-  a1_ = 2 * (ohm * ohm - 1) / c;
-  a2_ = (1.0 - 2 * std::cos(M_PI / 4) * ohm + ohm * ohm) / c;
-  u_k1_ = 0;
-  u_k2_ = 0;
-
-  accelerations_.assign(kSpaceDim, 0);
-  velocities_.assign(kSpaceDim, 0);
-
-  publisher_period_ = 1.0 / params_.rate;
-
-  if (signal_type_ == SignalType::kStepSequence || signal_type_ == SignalType::kCPGLegTrajectory) {
+  if (signal_type_ == SignalType::kStepSequence ||
+    signal_type_ == SignalType::kCPGLegTrajectory)
+  {
     RCLCPP_INFO(get_logger(),
       "Starting '%s' reference signal", params_.signal_type.c_str());
   } else {
@@ -196,18 +187,28 @@ double KinematicReference::cpg_amplitude()
 {
   static double ree = 1e-6;
 
-  ree += publisher_period_ * (50.0 * (1.0 - ree * ree) * ree);
+  ree += timer_period_ * (50.0 * (1.0 - ree * ree) * ree);
   return ree;
 }
 
 double KinematicReference::lpf_biquad(const double sample)
 {
+  static double ohm = tanf(M_PI * 0.1);
+  static double c = 1.0 + 2 * std::cos(M_PI / 4) * ohm + ohm * ohm;
+  static double b0_ = ohm * ohm / c;
+  static double b1_ = 2 * b0_;
+  static double a1_ = 2 * (ohm * ohm - 1) / c;
+  static double a2_ = (1.0 - 2 * std::cos(M_PI / 4) * ohm + ohm * ohm) / c;
+  static double u_k1_ = 0;
+  static double u_k2_ = 0;
+  static double u_k0_;
+  static double y_k_;
+
   u_k0_ = sample - u_k1_ * a1_ - u_k2_ * a2_;
-  y_k_ = u_k0_ * b0_ + u_k1_ * b1_ + u_k2_ * b2_;
+  y_k_ = u_k0_ * b0_ + u_k1_ * b1_ + u_k2_ * b0_;
 
   u_k2_ = u_k1_;
   u_k1_ = u_k0_;
-
   return y_k_;
 }
 
