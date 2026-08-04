@@ -114,8 +114,6 @@ CallbackReturn KinematicReference::on_activate(
       break;
   }
 
-  angular_freq_ = PI_2 / params_.period;
-
   if (signal_type_ == SignalType::kStepSequence ||
     signal_type_ == SignalType::kCPGLegTrajectory)
   {
@@ -158,16 +156,8 @@ void KinematicReference::publisher_callback()
   }
 
   switch (signal_type_) {
-    case SignalType::kSineWave:
-      positions_[axis_] +=
-        params_.amplitude * std::sin(angular_freq_ * ellapsed_time_);
-      velocities_[axis_] =
-        params_.amplitude * angular_freq_ * std::cos(angular_freq_ * ellapsed_time_);
-      accelerations_[axis_] =
-        -params_.amplitude * std::pow(angular_freq_, 2) * std::sin(angular_freq_ * ellapsed_time_);
-      break;
     case SignalType::kCPGLegTrajectory:
-      cpg_phase_ = angular_freq_ * ellapsed_time_;
+      cpg_phase_ = omega * ellapsed_time_;
       positions_[0] =
         params_.cpg_x_offset - params_.cpg_length * cpg_amplitude() * std::cos(cpg_phase_);
       if (std::sin(cpg_phase_) > 0.0) {
@@ -225,6 +215,14 @@ void KinematicReference::step_callback()
 
 void KinematicReference::sinewave_callback()
 {
+  static double omega = PI_2 / params_.period;  // angular frequency
+  ellapsed_time_ = (get_clock()->now() - start_time_).seconds();
+
+  positions_[axis_] = params_.initial_pose[axis_] +
+    params_.amplitude * std::sin(omega * ellapsed_time_);
+  velocities_[axis_] = params_.amplitude * omega * std::cos(omega * ellapsed_time_);
+  accelerations_[axis_] = -params_.amplitude * omega * omega * std::sin(omega * ellapsed_time_);
+
   set_message();
   publisher_->publish(message_);
 }
