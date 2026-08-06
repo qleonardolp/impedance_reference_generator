@@ -66,7 +66,7 @@ std::map<std::string, uint8_t> TypeMap = {
 const double PI_2 = 2 * M_PI;
 const uint8_t kSpaceDim = 6;  // Cartesian space dimension
 const uint8_t kPoseDim = kSpaceDim + 1;  // position + quaternion
-const double kTimeOffset = 2.0;  // seconds
+const double kTimeOffset = 5.0;  // seconds
 const double kSmoothStepEnd = kTimeOffset + 0.22;
 const double kSmoothStepSlope = 77.0;
 
