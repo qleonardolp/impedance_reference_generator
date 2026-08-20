@@ -128,9 +128,6 @@ private:
 
   std::shared_ptr<ParamListener> param_listener_;
   Params params_;
-
-  // PRBS random number generator (32 bits)
-  std::minstd_rand pseudo_rand;
 };
 
 }  // namespace quadruped_control
