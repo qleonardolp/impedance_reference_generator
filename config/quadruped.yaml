@@ -1,0 +1,14 @@
+quadruped_control:
+  ros__parameters:
+    control_topics: [
+      spot_fl_control/reference,
+      spot_fr_control/reference,
+      spot_hl_control/reference,
+      spot_hr_control/reference
+    ]
+    body_height: -0.1
+    fl_offset: [0.36,   0.24, 0.3]
+    fr_offset: [0.36,  -0.24, 0.3]
+    rl_offset: [-0.29,  0.24, 0.3]
+    rr_offset: [-0.29, -0.24, 0.3]
+    rate: 250

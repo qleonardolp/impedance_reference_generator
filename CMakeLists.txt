@@ -15,6 +15,7 @@ find_package(kinematic_pose_msgs REQUIRED)
 
 find_package(generate_parameter_library REQUIRED)
 
+# KinematicReference node
 generate_parameter_library(
   kinematic_reference_parameters
   src/kinematic_reference_parameters.yaml
@@ -36,14 +37,7 @@ target_link_libraries(kinematic_reference PUBLIC
   ${std_msgs_TARGETS}
 )
 
-install(
-  TARGETS
-    kinematic_reference
-    kinematic_reference_parameters
-  EXPORT export_kinematic_reference
-  DESTINATION lib/${PROJECT_NAME}
-)
-
+# Impedance identification node
 generate_parameter_library(
   impedance_id_parameters
   src/impedance_id_parameters.yaml
@@ -66,9 +60,39 @@ target_link_libraries(identification PUBLIC
   ${std_msgs_TARGETS}
 )
 
+# QuadrupedControl node
+generate_parameter_library(
+  quadruped_control_parameters
+  src/quadruped_control_parameters.yaml
+)
+
+add_executable(quadruped_control src/quadruped_control.cpp)
+target_include_directories(quadruped_control PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
+
+target_compile_features(quadruped_control PUBLIC c_std_99 cxx_std_17)
+
+target_link_libraries(quadruped_control PUBLIC
+  rclcpp::rclcpp
+  rclcpp_lifecycle::rclcpp_lifecycle
+  quadruped_control_parameters
+  ${kinematic_pose_msgs_TARGETS}
+  ${lifecycle_msgs_TARGETS}
+  ${std_msgs_TARGETS}
+)
+
 install(
   DIRECTORY config launch
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  TARGETS
+    kinematic_reference
+    kinematic_reference_parameters
+  EXPORT export_kinematic_reference
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 install(
@@ -79,6 +103,14 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(
+  TARGETS
+    quadruped_control
+    quadruped_control_parameters
+  EXPORT export_quadruped_control
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
@@ -86,4 +118,5 @@ endif()
 
 ament_export_targets(export_kinematic_reference HAS_LIBRARY_TARGET)
 ament_export_targets(export_identification HAS_LIBRARY_TARGET)
+ament_export_targets(export_quadruped_control HAS_LIBRARY_TARGET)
 ament_package()
