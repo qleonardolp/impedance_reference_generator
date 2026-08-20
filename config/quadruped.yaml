@@ -7,8 +7,8 @@ quadruped_control:
       spot_hr_control/reference
     ]
     body_height: -0.1
-    fl_offset: [0.36,   0.24, 0.3]
-    fr_offset: [0.36,  -0.24, 0.3]
-    rl_offset: [-0.29,  0.24, 0.3]
-    rr_offset: [-0.29, -0.24, 0.3]
+    fl_offset: [0.360, 0.20, 0.330]
+    fr_offset: [0.360,-0.2003, 0.330]
+    rl_offset: [-0.29, 0.20, 0.332]
+    rr_offset: [-0.29,-0.2003, 0.332]
     rate: 250

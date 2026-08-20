@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "robot_impedance_analyzer/quadruped_control.hpp"
+#include <chrono>
+#include <thread>
 
 namespace quadruped_control
 {
@@ -61,12 +63,12 @@ CallbackReturn QuadrupedControl::on_activate(
 
   uint timer_ms = static_cast<uint>(1000.0 / params_.rate);
   timer_period_ = 1.0 / static_cast<double>(params_.rate);
-  start_time_ = get_clock()->now();
-
-  RCLCPP_INFO(get_logger(), "Quadruped control: lifting...");
 
   set_initial_position();
+  std::this_thread::sleep_for(std::chrono::milliseconds(150));
 
+  RCLCPP_INFO(get_logger(), "Quadruped control: lifting...");
+  start_time_ = get_clock()->now();
   double lift_duration = 10.0;  // seconds
   double coeff = (params_.body_height - params_.fl_offset[2]) / lift_duration;
   double lift_time = (get_clock()->now() - start_time_).seconds();
